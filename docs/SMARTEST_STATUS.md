@@ -16,7 +16,7 @@ depends on what the rest of the room did. Red/Green, Yes/No, or a number from 1�
 rule under the question, never on a button. Five of them (Lowest Unique, Two Thirds, The Pot,
 Charity, Sus) only work with three or more players, so two-player matches are never dealt them.
 
-**Minigames (30).** Everyone plays the same level simultaneously. Fail and you're out of that
+**Minigames (46).** Everyone plays the same level simultaneously. Fail and you're out of that
 minigame. Levels 1–2 are warm-ups: clear one and you play on. From level 3, if nobody fails,
 the slowest goes. If everyone fails, the level comes back harder. Last one standing wins. 1st +20, 2nd +10, 3rd +5, last −5 — all three numbers live on
 GameConfig.
@@ -78,7 +78,7 @@ automatically. `GameState`, `GameUI`, `RoundDeck` and `SceneBuilder` are not tou
 2. **Tools ▸ Smartest ▸ Clean Up Retired Files** — the retired code is already gone; this now
    only offers the 16 unused pre-rewrite voice files (`<key>.mp3` without a number).
 3. **Tools ▸ Smartest ▸ Build Scenes** — keeps every generated file in step with the code (the
-   50 challenge assets, prefabs and both scenes). The ten new minigames are only dealt once
+   66 challenge assets, prefabs and both scenes). The 26 new minigames are only dealt once
    this has made their assets.
 4. **Window ▸ General ▸ Test Runner** — EditMode ▸ Run All (158) and PlayMode ▸ Run All.
 5. Play from `Menu.unity`. Two instances (or two PCs) to see a real elimination.
@@ -92,7 +92,7 @@ automatically. `GameState`, `GameUI`, `RoundDeck` and `SceneBuilder` are not tou
 - Minigame feel. Every level ramp is a first draft, meant to be tuned by playing. Hiding the
   level until GO (see below) made the memory and flash games noticeably harder than before.
 
-116 of the 126 voice lines are recorded and wired. The ten new minigame intros aren't yet
+116 of the 142 voice lines are recorded and wired. The 26 new minigame intros aren't yet
 (Tools ▸ Smartest ▸ Voice Studio); until then those games start without a line.
 
 ## Known gaps and deliberate omissions
@@ -123,6 +123,32 @@ and there are ten new minigames in their spirit: visual, mostly mouse, one line 
 | Flash Point | A dot flashes; click where it was (two in a row from level 6) | too far off | distance off |
 | Hover | Hold the button to rise; stay in the moving gold zone | out of it for a moment | average distance from its middle |
 | Lasers | Slip the cursor through the gap in every red beam | a beam touches you | narrowest escape |
+
+Then, asked for at least 30 games of the Simon / catching / keep-the-mouse-on-it kind (15
+existed), sixteen more:
+
+| Game | What you do | Out when | Ranked by |
+|---|---|---|---|
+| Catch | Basket follows the mouse; catch every falling ball | one drops | average distance from the basket's middle |
+| Good Catch | Catch, with red balls that must fall past | a gold drops or a red is caught | same |
+| Goalie | Glove follows the mouse up and down; stop every shot | one goes in | average distance from the glove's middle |
+| Fireflies | Touch every wandering firefly with the cursor (they shy away from level 6) | time runs out | time |
+| Runaway | A dot flees the cursor; corner it and click it (it tires) | it gets away | time |
+| Toss | Things are thrown up in arcs; click each before it lands | one lands | total reaction time |
+| Chimp Test | Numbers hide after you click the 1; click the rest in order from memory | wrong order | time |
+| Pairs | Cards show for a moment, then match every pair | time runs out | time |
+| Echo | Classic four-colour Simon: play the sequence back | wrong colour | time |
+| Backwards | Simon played back last-first | wrong box | time |
+| Decoy | Stay on your ball while identical ones cross it | you follow the wrong one | average distance |
+| Ring | Keep the cursor in a ring that swells, shrinks and drifts | you leave the band | average distance from the band's middle |
+| Road | Steer a car along a winding road you can see coming | off the road | average distance from the middle |
+| Spotlight | The cursor is a torch in the dark; find and click the gold dot | wrong dot, or time | time |
+| Tag | Red dots chase the cursor round a box | tagged, or you leave the box | closest they got |
+| Pour | Hold to pour, let go on the line (surges and settling later) | spilled, or too far off | distance from the line |
+
+Spotlight's torch is a round UI `Mask` that follows the cursor over a scene held still behind
+it. Echo's pads are plain boxes rather than kit cells, so its red and green are just colours.
+Backwards is `SimonGame` with a `Backwards` switch.
 
 Every level is built from the shared seed, so everyone plays the same one. The physics games
 (Keepy Uppy, Flap, Hover) step in fixed 1/240 s steps, so frame rate doesn't change the ball.

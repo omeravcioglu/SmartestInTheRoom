@@ -247,6 +247,121 @@ namespace Smartest.Minigames
                 Rule = "A dot flashes and disappears. Click exactly where it was.",
                 Controls = "CLICK", ViewType = typeof(FlashPointGame),
                 Order = MetricOrder.LowerIsBetter, LevelSeconds = 10f },
+
+            // ---------------- Catching ----------------
+            new MinigameEntry {
+                Id = "catch", RoundId = 131, Title = "Catch",
+                Prompt = "Eyes up, basket down.",
+                Rule = "Move the basket with your mouse and catch every falling ball. Miss one and you're out.",
+                Controls = "MOUSE", ViewType = typeof(CatchGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 13f },
+
+            new MinigameEntry {
+                Id = "good_catch", RoundId = 132, Title = "Good Catch",
+                Prompt = "Gold in, red out.",
+                Rule = "Catch the gold, let the red fall past. Miss a gold or catch a red and you're out.",
+                Controls = "MOUSE", ViewType = typeof(GoodCatchGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 15f },
+
+            new MinigameEntry {
+                Id = "goalie", RoundId = 133, Title = "Goalie",
+                Prompt = "Nothing gets past.",
+                Rule = "Move your glove up and down to stop every shot. Let one in and you're out.",
+                Controls = "MOUSE", ViewType = typeof(GoalieGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 13f },
+
+            new MinigameEntry {
+                Id = "fireflies", RoundId = 134, Title = "Fireflies",
+                Prompt = "Catch them by touch.",
+                Rule = "Touch every firefly with your cursor before time runs out. They won't sit still.",
+                Controls = "MOUSE", ViewType = typeof(FirefliesGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 11f },
+
+            new MinigameEntry {
+                Id = "runaway", RoundId = 135, Title = "Runaway",
+                Prompt = "It doesn't want to be caught.",
+                Rule = "The dot runs from your cursor. Corner it and click it before time runs out.",
+                Controls = "CLICK", ViewType = typeof(RunawayGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 12f },
+
+            new MinigameEntry {
+                Id = "toss", RoundId = 136, Title = "Toss",
+                Prompt = "Get them in the air.",
+                Rule = "Things fly up from below. Click each one before it falls back down.",
+                Controls = "CLICK", ViewType = typeof(TossGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 15f },
+
+            // ---------------- Memory, Simon-style ----------------
+            new MinigameEntry {
+                Id = "chimp", RoundId = 137, Title = "Chimp Test",
+                Prompt = "Remember where they were.",
+                Rule = "Click the numbers from 1 up. After your first click the rest hide, so remember where they were.",
+                Controls = "CLICK", ViewType = typeof(ChimpGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 16f },
+
+            new MinigameEntry {
+                Id = "pairs", RoundId = 138, Title = "Pairs",
+                Prompt = "Look quick, match them all.",
+                Rule = "The cards show for a moment. Then flip two at a time and match every pair.",
+                Controls = "CLICK", ViewType = typeof(PairsGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 20f },
+
+            new MinigameEntry {
+                Id = "echo", RoundId = 139, Title = "Echo",
+                Prompt = "Say it back in colours.",
+                Rule = "Watch the colours light up, then click them back in the same order.",
+                Controls = "CLICK", ViewType = typeof(EchoGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 18f },
+
+            new MinigameEntry {
+                Id = "backwards", RoundId = 146, Title = "Backwards",
+                Prompt = "Simon, the other way round.",
+                Rule = "Watch the boxes flash, then click them back in REVERSE order. One wrong click and you're out.",
+                Controls = "CLICK", ViewType = typeof(BackwardsGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 18f },
+
+            // ---------------- Mouse: stay on it ----------------
+            new MinigameEntry {
+                Id = "decoy", RoundId = 140, Title = "Decoy",
+                Prompt = "Only yours.",
+                Rule = "Stay on your ball. Look-alikes cross its path; don't follow them.",
+                Controls = "MOUSE", ViewType = typeof(DecoyGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 12f },
+
+            new MinigameEntry {
+                Id = "ring", RoundId = 141, Title = "Ring",
+                Prompt = "It breathes.",
+                Rule = "Keep your cursor inside the gold ring as it grows and shrinks.",
+                Controls = "MOUSE", ViewType = typeof(RingGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 12f },
+
+            new MinigameEntry {
+                Id = "road", RoundId = 142, Title = "Road",
+                Prompt = "Mind the bends.",
+                Rule = "Steer with your mouse and keep the dot on the winding road.",
+                Controls = "MOUSE", ViewType = typeof(RoadGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 12f },
+
+            new MinigameEntry {
+                Id = "spotlight", RoundId = 143, Title = "Spotlight",
+                Prompt = "Lights out.",
+                Rule = "It's dark and your cursor is a torch. Find the gold dot and click it.",
+                Controls = "CLICK", ViewType = typeof(SpotlightGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 12f },
+
+            new MinigameEntry {
+                Id = "tag", RoundId = 144, Title = "Tag",
+                Prompt = "You're not it.",
+                Rule = "The red dot chases your cursor. Keep away from it and stay in the box.",
+                Controls = "MOUSE", ViewType = typeof(TagGame),
+                Order = MetricOrder.HigherIsBetter, LevelSeconds = 12f },
+
+            new MinigameEntry {
+                Id = "pour", RoundId = 145, Title = "Pour",
+                Prompt = "Stop on the line.",
+                Rule = "Hold the mouse button to pour. Let go on the line. Spill over and you're out.",
+                Controls = "HOLD CLICK", ViewType = typeof(PourGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 10f },
         };
 
         public static MinigameEntry Get(string id)

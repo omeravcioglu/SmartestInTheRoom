@@ -299,6 +299,22 @@ namespace Smartest.Core
                 { "keepy_uppy",   "Keepy Uppy. Don't let it touch the floor. That's it. That's the game." },
                 { "flap",         "Flap. You know this one. You hate this one." },
                 { "flash_point",  "Flash Point. It's there, then it isn't. Remember where." },
+                { "catch",        "Catch. Eyes up, basket down. Don't drop anything." },
+                { "good_catch",   "Good Catch. Gold is good. Red is not. You'd think that was obvious." },
+                { "goalie",       "Goalie. Everything's coming at you. Stop all of it." },
+                { "fireflies",    "Fireflies. Touch them all. They're quicker than they look." },
+                { "runaway",      "Runaway. It doesn't want to be caught. Corner it." },
+                { "toss",         "Toss. Up they go. Get them before they come down." },
+                { "chimp",        "Chimp Test. Actual chimps are good at this. No pressure." },
+                { "pairs",        "Pairs. Look quick, remember everything, match it all." },
+                { "echo",         "Echo. Watch the colours. Say them back. With your mouse." },
+                { "backwards",    "Backwards. Same as Simon, but the other way round. Good luck with that." },
+                { "decoy",        "Decoy. Follow your ball. Only yours. They all look the same." },
+                { "ring",         "Ring. Stay in the ring. It breathes. So should you." },
+                { "road",         "Road. Keep it on the road. Don't take the scenic route." },
+                { "spotlight",    "Spotlight. Lights off. Find the gold. Don't click the wrong one." },
+                { "tag",          "Tag. You're not it. Keep it that way." },
+                { "pour",         "Pour. Stop on the line. Not above it. Definitely not above it." },
             };
 
             var list = new List<Entry>();

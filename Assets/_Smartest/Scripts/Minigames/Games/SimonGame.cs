@@ -21,11 +21,15 @@ namespace Smartest.Minigames
         private int _index;
         private bool _playing;
 
+        /// <summary>Backwards plays it back last-first; a reversed span runs about one shorter.</summary>
+        protected virtual bool Backwards => false;
+
         protected override void Build()
         {
             var size = AreaSize;
             int n = Level >= 5 ? 4 : 3;
             int len = Mathf.Min(9, 3 + (Level - 1));
+            if (Backwards) len = Mathf.Max(3, len - 1);
             _step = Mathf.Max(0.26f, 0.55f - (Level - 1) * 0.04f);
 
             float available = Mathf.Min(size.x - 80f, size.y - 90f);
@@ -56,7 +60,7 @@ namespace Smartest.Minigames
                     _showUntil = Elapsed;
                     if (_shown >= 0) _cells[_sequence[_shown]].color = Palette.Neutral;
                     _shown = -1;
-                    if (_label != null) { _label.text = "REPEAT IT"; _label.color = Palette.Text; }
+                    if (_label != null) { _label.text = Backwards ? "NOW BACKWARDS" : "REPEAT IT"; _label.color = Palette.Text; }
                     return;
                 }
                 if (step != _shown)
@@ -78,7 +82,8 @@ namespace Smartest.Minigames
         {
             if (!CanAct || !_playing) return;
 
-            if (index != _sequence[_index])
+            int expected = _sequence[Backwards ? _sequence.Count - 1 - _index : _index];
+            if (index != expected)
             {
                 _cells[index].color = Palette.Red;
                 Fail("WRONG ORDER");
