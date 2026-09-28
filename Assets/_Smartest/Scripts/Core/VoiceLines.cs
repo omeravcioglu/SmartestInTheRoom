@@ -42,11 +42,18 @@ namespace Smartest.Core
 
         public static VoiceLines Instance { get; private set; }
 
+        /// <summary>
+        /// A line just started playing: (what the host says, how long the clip runs). The host
+        /// caption shows exactly this text for exactly that long.
+        /// </summary>
+        public static event Action<string, float> LineStarted;
+
         private readonly Dictionary<string, VoiceLine> _map = new Dictionary<string, VoiceLine>();
         private readonly HashSet<string> _playedOnce = new HashSet<string>();
         private readonly Dictionary<string, float> _lastPlayed = new Dictionary<string, float>();
         private readonly Dictionary<string, List<int>> _bags = new Dictionary<string, List<int>>();
         private readonly Dictionary<string, int> _lastVariant = new Dictionary<string, int>();
+        private readonly Dictionary<string, string> _lastText = new Dictionary<string, string>();
         private int _currentPriority = int.MinValue;
 
         public IReadOnlyList<VoiceLine> Lines => lines;
@@ -98,6 +105,17 @@ namespace Smartest.Core
             if (Instance != null) Instance.StartCoroutine(Instance.DelayedRoutine(key, delaySeconds));
         }
 
+        /// <summary>
+        /// The words of the variant played last for <paramref name="key"/>, or the first written
+        /// variant if it hasn't played (or was never recorded). Null for an unknown key.
+        /// </summary>
+        public static string TextOf(string key)
+        {
+            if (Instance == null || string.IsNullOrEmpty(key)) return null;
+            if (Instance._lastText.TryGetValue(key, out var said)) return said;
+            return Instance._map.TryGetValue(key, out var l) && l.texts != null && l.texts.Length > 0 ? l.texts[0] : null;
+        }
+
         /// <summary>True if the key exists and has at least one recorded clip.</summary>
         public static bool Has(string key)
         {
@@ -122,7 +140,8 @@ namespace Smartest.Core
 
             if (line.mode == PlayMode.Chance && UnityEngine.Random.value > line.chance) return;
 
-            var clip = NextVariant(line);
+            int variant = NextVariant(line);
+            var clip = variant >= 0 ? line.clips[variant] : null;
             if (clip == null) return; // not recorded yet: stay silent, don't complain every time
 
             var director = AudioDirector.Instance;
@@ -136,18 +155,25 @@ namespace Smartest.Core
             _lastPlayed[key] = Time.unscaledTime;
             if (once) _playedOnce.Add(key);
             StartCoroutine(ResetPriorityAfter(clip.length));
+
+            string said = line.texts != null && variant < line.texts.Length ? line.texts[variant] : null;
+            if (!string.IsNullOrEmpty(said))
+            {
+                _lastText[key] = said;
+                LineStarted?.Invoke(said, clip.length);
+            }
         }
 
         /// <summary>
         /// Shuffle-bag selection: every variant is heard once before any repeats, and the
         /// first line of a new bag is never the last line of the old one.
         /// </summary>
-        private AudioClip NextVariant(VoiceLine line)
+        private int NextVariant(VoiceLine line)
         {
             var available = new List<int>();
             for (int i = 0; i < line.clips.Length; i++) if (line.clips[i] != null) available.Add(i);
-            if (available.Count == 0) return null;
-            if (available.Count == 1) return line.clips[available[0]];
+            if (available.Count == 0) return -1;
+            if (available.Count == 1) return available[0];
 
             if (!_bags.TryGetValue(line.key, out var bag) || bag.Count == 0)
             {
@@ -165,7 +191,7 @@ namespace Smartest.Core
             int pick = bag[bag.Count - 1];
             bag.RemoveAt(bag.Count - 1);
             _lastVariant[line.key] = pick;
-            return line.clips[pick];
+            return pick;
         }
 
         private IEnumerator ResetPriorityAfter(float seconds)

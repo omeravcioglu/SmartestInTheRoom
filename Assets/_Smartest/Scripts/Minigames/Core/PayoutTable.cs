@@ -43,8 +43,15 @@ namespace Smartest.Minigames
                 return deltas;
             }
 
-            int worst = 0;
-            foreach (var kv in places) worst = Math.Max(worst, kv.Value);
+            int best = int.MaxValue, worst = 0;
+            foreach (var kv in places)
+            {
+                worst = Math.Max(worst, kv.Value);
+                if (kv.Value > 0) best = Math.Min(best, kv.Value);
+            }
+            // Everyone sharing one place (a stalemate at the level cap) means nobody finished
+            // last: they all get what that place pays instead of all taking the penalty.
+            if (best == worst) worst = int.MaxValue;
             foreach (var kv in places) deltas[kv.Key] = PointsFor(kv.Value, worst, placePoints, lastPlacePoints);
             return deltas;
         }

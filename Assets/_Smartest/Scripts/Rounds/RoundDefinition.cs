@@ -22,6 +22,8 @@ namespace Smartest.Rounds
         public RoundKind kind = RoundKind.Social;
         [Tooltip("Minigames only: which entry of MinigameRegistry this round plays.")]
         public string minigameId;
+        [Tooltip("Fewest players this round makes sense with. Smaller matches never draw it.")]
+        public int minPlayers = 1;
 
         [Header("Rule")]
         [Tooltip("THE rule. One or two short sentences — a player must get it in 2-4 seconds. " +
@@ -51,6 +53,9 @@ namespace Smartest.Rounds
         public AudioClip revealClip;
 
         public bool IsMinigame => kind == RoundKind.Minigame;
+
+        /// <summary>Whether a match of this many players can be dealt this round (0 = unknown: yes).</summary>
+        public bool WorksWith(int players) => players <= 0 || players >= minPlayers;
 
         public int Param(int index, int fallback)
         {

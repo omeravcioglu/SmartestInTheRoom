@@ -74,6 +74,19 @@ namespace Smartest.UI
             slideOffset = config.panelSlideOffset;
         }
 
+        /// <summary>Full-screen and modal panels fade only; a scaling scrim would show its edges.</summary>
+        public void SetMotion(float scaleFrom, Vector2 slide)
+        {
+            fromScale = scaleFrom;
+            slideOffset = slide;
+        }
+
+        /// <summary>Whether the panel starts hidden (default) or on screen.</summary>
+        public void SetStartHidden(bool hidden)
+        {
+            hiddenOnAwake = hidden;
+        }
+
         // ---- Instant states ----
 
         public void ShowInstant()

@@ -95,6 +95,8 @@ namespace Smartest.Rounds
         private double _phaseEnd;
         private bool _graceApplied;
         private System.Random _rng;
+        private int _startedWith;
+        private bool _abandoned;
 
         // Minigame working state
         private MinigameEntry _entry;
@@ -206,13 +208,16 @@ namespace Smartest.Rounds
                 return;
             }
             _rng = new System.Random(Environment.TickCount);
-            _deck = new ChallengeDeck(library.SocialIds(), library.MinigameIds(),
+            // Only questions that work with this many players (nobody can join mid-match).
+            _deck = new ChallengeDeck(library.SocialIds(PlayerData.All.Count), library.MinigameIds(),
                 id => library.GetById(id)?.inputType, Environment.TickCount,
-                Config.alternateSocialAndMinigame);
+                Config.alternateSocialAndMinigame, minigamesPerQuestion: Config.minigamesPerQuestion);
             _current = null;
             _continueSubRounds = false;
             _forceRedGreenNext = false;
             _pendingPredictions = null;
+            _startedWith = PlayerData.All.Count;
+            _abandoned = false;
             RoundIndex.Value = 0;
             WinnerClientId.Value = ulong.MaxValue;
             TieBreak.Value = false;
@@ -222,6 +227,7 @@ namespace Smartest.Rounds
 
         private void ServerTick()
         {
+            if (ServerEndIfAbandoned()) return;
             double now = ServerNow;
             switch (Phase.Value)
             {
@@ -266,6 +272,27 @@ namespace Smartest.Rounds
             }
         }
 
+        /// <summary>
+        /// A match that began with company is over once everyone else has left: there's nobody
+        /// to play against. One started solo is a test run and plays on, and a finished match
+        /// (the winner screen) stays up however many leave.
+        /// </summary>
+        public static bool IsAbandoned(int startedWith, int stillHere, GamePhase phase)
+            => startedWith > 1 && stillHere <= 1 && phase != GamePhase.Winner;
+
+        /// <summary>Everyone else left: end the match and take the host back to the lobby, which says why.</summary>
+        private bool ServerEndIfAbandoned()
+        {
+            if (_abandoned) return true; // the lobby is loading
+            if (!IsAbandoned(_startedWith, PlayerData.All.Count, Phase.Value)) return false;
+            var net = NetSession.Instance;
+            if (net == null) return false;
+            _abandoned = true;
+            NetSession.PendingMenuMessage = "Everyone else left, so the match ended.";
+            net.ReturnToLobby();
+            return true;
+        }
+
         private bool AllLockedIn()
         {
             var all = PlayerData.All;
@@ -282,6 +309,10 @@ namespace Smartest.Rounds
             }
             else
             {
+                // Someone who left may have taken the room below what a question needs (Sus
+                // can't pay out between two). Nobody joins mid-match, so this only ever shrinks.
+                int players = PlayerData.All.Count;
+                _deck.RemoveSocial(r => library.GetById(r) is RoundDefinition def && !def.WorksWith(players));
                 int id = _deck.Draw(_forceRedGreenNext ? InputType.RedGreen : (InputType?)null);
                 _forceRedGreenNext = false;
                 _current = library.GetById(id);
@@ -295,6 +326,8 @@ namespace Smartest.Rounds
                 p.LockedIn.Value = false;
                 p.CurrentAnswer.Value = -1;
                 p.PlayState.Value = PlayerData.PlayStateOut;
+                p.LevelDone.Value = false;
+                p.OutAtLevel.Value = 0;
             }
             Results.Clear();
             RevealLine.Value = new FixedString512Bytes(string.Empty);
@@ -342,7 +375,7 @@ namespace Smartest.Rounds
             _soloLevel = 1;
             _levelReports.Clear();
             _ladder = new EliminationLadder(ids, _entry != null ? _entry.Order : MetricOrder.LowerIsBetter,
-                Config.minigameMaxLevels);
+                Config.minigameMaxLevels, Config.minigameWarmUpLevels);
             MinigameSeed.Value = _rng.Next(1, int.MaxValue);
             AliveCount.Value = ids.Count;
         }
@@ -364,6 +397,7 @@ namespace Smartest.Rounds
                 bool alive = _solo || Contains(_ladder.Alive, p.OwnerClientId);
                 p.PlayState.Value = plays ? PlayerData.PlayStatePlaying
                     : (alive ? PlayerData.PlayStateWatching : PlayerData.PlayStateOut);
+                p.LevelDone.Value = false;
             }
 
             SubRound.Value = level;
@@ -387,6 +421,7 @@ namespace Smartest.Rounds
             if (_levelReports.ContainsKey(id)) return;
 
             _levelReports[id] = new LevelReport(id, failed, metric);
+            player.LevelDone.Value = true; // the seat reads "DONE" while the others finish
 
             // Everyone has reported — close the level after a short grace instead of
             // making the room wait out the clock.
@@ -456,7 +491,16 @@ namespace Smartest.Rounds
             var reports = new List<LevelReport>(_levelReports.Count);
             foreach (var kv in _levelReports) reports.Add(kv.Value);
 
+            int levelPlayed = SubRound.Value;
             var step = _ladder.Submit(reports);
+            if (step.Eliminated != null)
+            {
+                foreach (var id in step.Eliminated)
+                {
+                    var gone = PlayerData.Get(id);
+                    if (gone != null) gone.OutAtLevel.Value = levelPlayed;
+                }
+            }
             LevelLine.Value = new FixedString128Bytes(Truncate(DescribeStep(step), 120));
             LevelOutcome.Value = step.RepeatHarder ? OutcomeRepeat
                 : step.TieBreak ? OutcomeTieBreak
@@ -484,6 +528,14 @@ namespace Smartest.Rounds
                 var names = new List<string>();
                 foreach (var id in step.Eliminated) names.Add(NameOf(id));
                 return "OUT: " + JoinNames(names);
+            }
+            // A warm-up level everyone cleared. Say when the real cuts start.
+            if (step.AllThrough)
+            {
+                int more = _ladder.WarmUpLevels - step.Level;
+                return more <= 0 ? "Everyone made it. From now on the worst result goes out too."
+                    : more == 1 ? "Everyone made it. One more warm-up."
+                    : $"Everyone made it. {more} more warm-ups.";
             }
             return string.Empty;
         }
@@ -517,11 +569,11 @@ namespace Smartest.Rounds
                     _finalDeltas[i] = deltas.TryGetValue(id, out int d) ? d : 0;
                 }
 
-                ulong winner = 0UL;
-                bool haveWinner = false;
-                foreach (var kv in finalPlaces) if (kv.Value == 1) { winner = kv.Key; haveWinner = true; break; }
-                line = haveWinner
-                    ? $"{NameOf(winner)} takes it."
+                // A stalemate at the level cap can leave several players sharing first.
+                var firsts = new List<string>();
+                foreach (var kv in finalPlaces) if (kv.Value == 1) firsts.Add(NameOf(kv.Key));
+                line = firsts.Count == 1 ? $"{firsts[0]} takes it."
+                    : firsts.Count > 1 ? $"{JoinNames(firsts)} share it."
                     : "Nobody survived that one.";
             }
 

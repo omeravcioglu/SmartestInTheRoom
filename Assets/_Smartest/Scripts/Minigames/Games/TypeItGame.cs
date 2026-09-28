@@ -36,6 +36,7 @@ namespace Smartest.Minigames
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, 140f));
             _target = UiKit.Label(Area, "Word", _word, 60f, Palette.Text,
                 new Vector2(size.x - 60f, 90f), new Vector2(0f, 70f));
+            UiKit.UseMono(_target); // the word you type, in the face you type it in
 
             _field = UiKit.Field(Area, new Vector2(Mathf.Min(620f, size.x - 80f), 80f), new Vector2(0f, -30f));
             _field.onSubmit.AddListener(OnSubmit);

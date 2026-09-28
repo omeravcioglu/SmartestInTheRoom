@@ -431,7 +431,11 @@ namespace Smartest.Net
                 Destroy(go);
                 return;
             }
-            netObj.Spawn();
+            // destroyWithScene: the engine belongs to this one match. Netcode's default
+            // (false) would carry it into the Menu on "Back to lobby", still sitting in the
+            // Winner phase — and the next Start would find it "already spawned", so a new
+            // match would never begin.
+            netObj.Spawn(destroyWithScene: true);
             Debug.Log("[NetSession] GameState spawned.");
         }
 

@@ -15,6 +15,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.TextCore.LowLevel;
 using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem.UI;
@@ -25,13 +26,21 @@ namespace Smartest.EditorTools
     /// <summary>
     /// Tools > Smartest > Build Scenes.
     ///
-    ///  - folder layout, rounded 9-slice sprite, GameConfig asset
-    ///  - 25 RoundDefinition assets (Data/Rounds) + RoundLibrary (Data) from RoundCatalog
+    ///  - folder layout, GameConfig asset
+    ///  - the Tabloid art: every shape in InkSprites baked to Resources/Ink as a sprite
+    ///  - fonts: TextMeshPro assets for whatever TTFs are in Assets/_Smartest/Fonts, listed in
+    ///    Resources/SmartestFonts (missing faces fall back to TMP's default font)
+    ///  - one RoundDefinition asset per challenge (Data/Rounds) from RoundCatalog + MinigameRegistry,
+    ///    listed in Resources/RoundLibrary
     ///  - Prefabs: Resources/Bootstrap (GameBootstrap + NetworkManager + UnityTransport + NetSession + VoiceLines),
-    ///             Prefabs/PlayerData (NetworkObject + PlayerData), Prefabs/PlayerRow, Prefabs/RevealRow
-    ///  - Menu.unity: menu / join / lobby, fully wired
-    ///  - Game.unity: GameState (in-scene NetworkObject), scoreboard, round / reveal / winner panels, fully wired
+    ///             Resources/GameState (spawned by the host once everyone has loaded Game),
+    ///             Prefabs/PlayerData (NetworkObject + PlayerData)
+    ///  - Menu.unity: front page / join card / lobby / sound, fully wired
+    ///  - Game.unity: masthead, seat rail, host caption, round / minigame / reveal stage, winner page
     /// Re-running is safe: assets are updated in place (GUIDs stay stable), scenes are rebuilt.
+    ///
+    /// Without the editor open:
+    ///   Unity.exe -batchmode -projectPath &lt;project&gt; -executeMethod Smartest.EditorTools.SceneBuilder.BuildScenesBatch -quit
     /// </summary>
     public static class SceneBuilder
     {
@@ -39,16 +48,17 @@ namespace Smartest.EditorTools
         private const string ScenesDir = Root + "/Scenes";
         private const string MenuScenePath = ScenesDir + "/Menu.unity";
         private const string GameScenePath = ScenesDir + "/Game.unity";
-        private const string SpritePath = Root + "/Sprites/RoundedPanel.png";
         private const string ConfigPath = Root + "/Data/GameConfig.asset";
         private const string LibraryPath = Root + "/Resources/RoundLibrary.asset"; // loadable by name at runtime
         private const string RoundsDir = Root + "/Data/Rounds";
         private const string VoiceDir = Root + "/Audio/Voice";
+        private const string InkDir = Root + "/Resources/" + InkSprites.Folder;
+        private const string FontsDir = Root + "/Fonts";
+        private const string FontAssetsDir = FontsDir + "/SDF";
+        private const string FontSetPath = Root + "/Resources/" + Typo.ResourceName + ".asset";
         private const string BootstrapPrefabPath = Root + "/Resources/Bootstrap.prefab";
         private const string GameStatePrefabPath = Root + "/Resources/GameState.prefab";
         private const string PlayerDataPrefabPath = Root + "/Prefabs/PlayerData.prefab";
-        private const string PlayerRowPrefabPath = Root + "/Prefabs/PlayerRow.prefab";
-        private const string RevealRowPrefabPath = Root + "/Prefabs/RevealRow.prefab";
         private const string DefaultNetworkPrefabsPath = "Assets/DefaultNetworkPrefabs.asset";
 
         private const float RefW = 1920f;
@@ -57,7 +67,7 @@ namespace Smartest.EditorTools
         [MenuItem("Tools/Smartest/Build Scenes")]
         public static void BuildScenes()
         {
-            if (Resources.Load<TMP_Settings>("TMP Settings") == null)
+            if (!TmpReady())
             {
                 EditorUtility.DisplayDialog(
                     "Import TMP Essentials first",
@@ -75,31 +85,57 @@ namespace Smartest.EditorTools
             {
                 bool ok = EditorUtility.DisplayDialog(
                     "Rebuild scenes?",
-                    "Menu.unity / Game.unity already exist under _Smartest/Scenes.\n\nRebuild them (prefabs and round assets are updated in place)?",
+                    "Menu.unity / Game.unity already exist under _Smartest/Scenes.\n\nRebuild them (prefabs, art, fonts and round assets are updated in place)?",
                     "Rebuild", "Cancel");
                 if (!ok) return;
             }
 
+            Build();
+            EditorSceneManager.OpenScene(MenuScenePath);
+        }
+
+        /// <summary>The same build with no dialogs, for -batchmode -executeMethod.</summary>
+        public static void BuildScenesBatch()
+        {
+            try
+            {
+                if (!TmpReady())
+                {
+                    Debug.LogError("[Smartest] TMP Essential Resources are missing; import them once from the editor.");
+                    EditorApplication.Exit(2);
+                    return;
+                }
+                Build();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogException(e);
+                EditorApplication.Exit(1);
+            }
+        }
+
+        private static bool TmpReady() => Resources.Load<TMP_Settings>("TMP Settings") != null;
+
+        private static void Build()
+        {
             EnsureFolders();
-            Sprite rounded = GenerateRoundedSprite(SpritePath, 64, 16f);
+            BakeInkSprites();
+            BuildFonts();
             GameConfig config = EnsureGameConfig();
             RoundLibrary library = BuildRoundAssets();
 
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             GameObject playerDataPrefab = BuildPlayerDataPrefab();
             GameObject gameStatePrefab = BuildGameStatePrefab();
-            GameObject playerRowPrefab = BuildPlayerRowPrefab(rounded);
-            GameObject revealRowPrefab = BuildRevealRowPrefab(rounded);
             BuildBootstrapPrefab(config, playerDataPrefab, gameStatePrefab);
             AssetDatabase.SaveAssets();
 
-            BuildMenuScene(rounded, config, playerRowPrefab);
-            BuildGameScene(rounded, config, playerRowPrefab, revealRowPrefab);
+            BuildMenuScene(config);
+            BuildGameScene(config);
 
             AddScenesToBuildSettings();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            EditorSceneManager.OpenScene(MenuScenePath);
 
             Debug.Log($"[Smartest] Build complete: {library.rounds.Count} rounds, prefabs, Menu (0) + Game (1). Press Play in Menu.");
         }
@@ -119,7 +155,7 @@ namespace Smartest.EditorTools
                 Root + "/Editor", Root + "/Prefabs",
                 Root + "/Data", RoundsDir,
                 Root + "/Audio", VoiceDir, Root + "/Audio/Music",
-                Root + "/Resources", Root + "/Sprites",
+                Root + "/Resources", InkDir, FontsDir, FontAssetsDir,
                 Root + "/Tests", Root + "/Tests/EditMode"
             };
             foreach (var f in folders) EnsureFolder(f);
@@ -133,6 +169,212 @@ namespace Smartest.EditorTools
             string leaf = Path.GetFileName(path);
             if (!AssetDatabase.IsValidFolder(parent)) EnsureFolder(parent);
             AssetDatabase.CreateFolder(parent, leaf);
+        }
+
+        private static string SysPath(string assetPath) =>
+            Path.Combine(Application.dataPath, assetPath.Substring("Assets/".Length));
+
+        // ------------------------------------------------------------------
+        // Art: every InkSprites shape, baked to Resources/Ink
+        // ------------------------------------------------------------------
+
+        private static void BakeInkSprites()
+        {
+            var wanted = new List<(string path, Vector4 border, FilterMode filter)>();
+            foreach (var baked in InkSprites.RenderCatalogue())
+            {
+                string path = $"{InkDir}/{baked.Name}.png";
+                byte[] png = baked.Texture.EncodeToPNG();
+                var filter = baked.Texture.filterMode;
+                Object.DestroyImmediate(baked.Texture);
+
+                string sys = SysPath(path);
+                if (!File.Exists(sys) || !SameBytes(File.ReadAllBytes(sys), png))
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(sys));
+                    File.WriteAllBytes(sys, png);
+                }
+                wanted.Add((path, baked.Border, filter));
+            }
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+
+            int changed = 0;
+            foreach (var (path, border, filter) in wanted)
+            {
+                var ti = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (ti == null) continue;
+                var settings = new TextureImporterSettings();
+                ti.ReadTextureSettings(settings);
+                bool same = ti.textureType == TextureImporterType.Sprite
+                            && ti.spriteImportMode == SpriteImportMode.Single
+                            && Mathf.Approximately(ti.spritePixelsPerUnit, InkSprites.PixelsPerUnit)
+                            && !ti.mipmapEnabled && ti.alphaIsTransparency
+                            && ti.filterMode == filter
+                            && ti.textureCompression == TextureImporterCompression.Uncompressed
+                            && settings.spriteBorder == border
+                            && settings.spriteMeshType == SpriteMeshType.FullRect;
+                if (same) continue;
+
+                ti.textureType = TextureImporterType.Sprite;
+                ti.spriteImportMode = SpriteImportMode.Single;
+                ti.spritePixelsPerUnit = InkSprites.PixelsPerUnit;
+                ti.mipmapEnabled = false;
+                ti.alphaIsTransparency = true;
+                ti.wrapMode = TextureWrapMode.Clamp;
+                ti.filterMode = filter;
+                ti.textureCompression = TextureImporterCompression.Uncompressed;
+                ti.ReadTextureSettings(settings);
+                settings.spriteBorder = border;
+                settings.spriteMeshType = SpriteMeshType.FullRect;
+                settings.spriteGenerateFallbackPhysicsShape = false;
+                ti.SetTextureSettings(settings);
+                ti.SaveAndReimport();
+                changed++;
+            }
+            InkSprites.ClearCache();
+            Debug.Log($"[Smartest] Ink art: {wanted.Count} sprites ({changed} re-imported).");
+        }
+
+        private static bool SameBytes(byte[] a, byte[] b)
+        {
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++) if (a[i] != b[i]) return false;
+            return true;
+        }
+
+        // ------------------------------------------------------------------
+        // Fonts: TMP assets for the TTFs in Assets/_Smartest/Fonts
+        // ------------------------------------------------------------------
+
+        /// <summary>Static TTFs from Google Fonts (Archivo, Atkinson Hyperlegible Next and Mono).</summary>
+        private static readonly (string slot, string file)[] FontFiles =
+        {
+            ("display", "Archivo_ExtraCondensed-Black"),
+            ("sticker", "Archivo-Black"),
+            ("names", "Archivo_Condensed-ExtraBold"),
+            ("label", "Archivo_Expanded-ExtraBold"),
+            ("body", "AtkinsonHyperlegibleNext-Regular"),
+            ("bodyBold", "AtkinsonHyperlegibleNext-Bold"),
+            ("bodyItalic", "AtkinsonHyperlegibleNext-Italic"),
+            ("bodyBoldItalic", "AtkinsonHyperlegibleNext-BoldItalic"),
+            ("mono", "AtkinsonHyperlegibleMono-ExtraBold"),
+        };
+
+        /// <summary>
+        /// Every character the game puts on screen beyond plain ASCII. Each face is checked against
+        /// it at build time, so a gap shows up in the build log rather than as a box in the game.
+        /// (The glyphs aren't kept: TMP empties dynamic atlases when the editor quits and fills
+        /// them again on demand from the TTF, Turkish letters included.)
+        /// </summary>
+        private const string BakedCharacters =
+            " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~" +
+            "çğıİöşüÇĞÖŞÜâîûÂÎÛéèêáàäëïôÉÈÁÀÄÖ" +
+            "–—‘’“”…·−↑↓↔×▲►▼◄√";
+
+        private static void BuildFonts()
+        {
+            var set = AssetDatabase.LoadAssetAtPath<FontSet>(FontSetPath);
+            if (set == null)
+            {
+                set = ScriptableObject.CreateInstance<FontSet>();
+                AssetDatabase.CreateAsset(set, FontSetPath);
+            }
+
+            var faces = new Dictionary<string, TMP_FontAsset>();
+            foreach (var (slot, file) in FontFiles)
+            {
+                var ttf = FindFont(file);
+                if (ttf == null) continue;
+                var asset = EnsureFontAsset(ttf, file);
+                if (asset != null) faces[slot] = asset;
+            }
+
+            set.display = Face(faces, "display");
+            set.sticker = Face(faces, "sticker");
+            set.names = Face(faces, "names");
+            set.label = Face(faces, "label");
+            set.body = Face(faces, "body");
+            set.mono = Face(faces, "mono");
+
+            // Atkinson's bold and italic become the body face's <b> and <i>.
+            if (set.body != null)
+            {
+                var table = set.body.fontWeightTable;
+                if (table != null && table.Length > 7)
+                {
+                    table[4].italicTypeface = Face(faces, "bodyItalic");
+                    table[7].regularTypeface = Face(faces, "bodyBold");
+                    table[7].italicTypeface = Face(faces, "bodyBoldItalic");
+                    EditorUtility.SetDirty(set.body);
+                }
+            }
+
+            EditorUtility.SetDirty(set);
+            AssetDatabase.SaveAssets();
+            Typo.Reload();
+
+            if (faces.Count == 0)
+                Debug.Log("[Smartest] No Tabloid fonts in Assets/_Smartest/Fonts yet — text uses TextMeshPro's default face. " +
+                          "Drop the Archivo / Atkinson Hyperlegible TTFs there and rebuild.");
+            else
+                Debug.Log($"[Smartest] Fonts: {faces.Count}/{FontFiles.Length} faces found in {FontsDir}.");
+        }
+
+        private static TMP_FontAsset Face(Dictionary<string, TMP_FontAsset> faces, string slot)
+            => faces.TryGetValue(slot, out var f) ? f : null;
+
+        private static Font FindFont(string fileName)
+        {
+            if (!AssetDatabase.IsValidFolder(FontsDir)) return null;
+            foreach (string guid in AssetDatabase.FindAssets("t:Font", new[] { FontsDir }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (string.Equals(Path.GetFileNameWithoutExtension(path), fileName, System.StringComparison.OrdinalIgnoreCase))
+                    return AssetDatabase.LoadAssetAtPath<Font>(path);
+            }
+            return null;
+        }
+
+        private static TMP_FontAsset EnsureFontAsset(Font font, string name)
+        {
+            string path = $"{FontAssetsDir}/{name} SDF.asset";
+            var existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
+            if (existing != null) return existing;
+
+            var asset = TMP_FontAsset.CreateFontAsset(font, 90, 9, GlyphRenderMode.SDFAA, 1024, 1024,
+                AtlasPopulationMode.Dynamic, true);
+            if (asset == null)
+            {
+                Debug.LogWarning($"[Smartest] Couldn't make a TextMeshPro font from {name}.");
+                return null;
+            }
+            asset.name = name + " SDF";
+            AssetDatabase.CreateAsset(asset, path);
+            // The atlas and material live inside the font asset.
+            if (asset.atlasTextures != null)
+            {
+                foreach (var tex in asset.atlasTextures)
+                {
+                    if (tex == null) continue;
+                    tex.name = name + " Atlas";
+                    AssetDatabase.AddObjectToAsset(tex, asset);
+                }
+            }
+            if (asset.material != null)
+            {
+                asset.material.name = name + " Material";
+                AssetDatabase.AddObjectToAsset(asset.material, asset);
+            }
+
+            asset.TryAddCharacters(BakedCharacters, out string missing); // a coverage check; see BakedCharacters
+            if (!string.IsNullOrEmpty(missing))
+                Debug.Log($"[Smartest] {name} has no glyph for: {missing} (TMP's fallback covers them).");
+            var fallback = TMP_Settings.defaultFontAsset;
+            if (fallback != null) asset.fallbackFontAssetTable = new List<TMP_FontAsset> { fallback };
+
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssets();
+            return asset;
         }
 
         private static GameConfig EnsureGameConfig()
@@ -199,59 +441,6 @@ namespace Smartest.EditorTools
             var sb = new System.Text.StringBuilder();
             foreach (char c in s) if (char.IsLetterOrDigit(c)) sb.Append(c);
             return sb.ToString();
-        }
-
-        private static Sprite GenerateRoundedSprite(string assetPath, int size, float radius)
-        {
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            float half = size / 2f;
-            var halfExtents = new Vector2(half, half);
-            var pixels = new Color32[size * size];
-
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    var p = new Vector2(x + 0.5f - half, y + 0.5f - half);
-                    var d = new Vector2(Mathf.Abs(p.x), Mathf.Abs(p.y)) - (halfExtents - new Vector2(radius, radius));
-                    float outside = new Vector2(Mathf.Max(d.x, 0f), Mathf.Max(d.y, 0f)).magnitude;
-                    float inside = Mathf.Min(Mathf.Max(d.x, d.y), 0f);
-                    float sd = outside + inside - radius;
-                    float a = Mathf.Clamp01(0.5f - sd);
-                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(a * 255f));
-                }
-            }
-
-            tex.SetPixels32(pixels);
-            tex.Apply();
-
-            string sysPath = Path.Combine(Application.dataPath, assetPath.Substring("Assets/".Length));
-            Directory.CreateDirectory(Path.GetDirectoryName(sysPath));
-            File.WriteAllBytes(sysPath, tex.EncodeToPNG());
-            Object.DestroyImmediate(tex);
-
-            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
-            var ti = AssetImporter.GetAtPath(assetPath) as TextureImporter;
-            if (ti != null)
-            {
-                ti.textureType = TextureImporterType.Sprite;
-                ti.spriteImportMode = SpriteImportMode.Single;
-                ti.mipmapEnabled = false;
-                ti.alphaIsTransparency = true;
-                ti.wrapMode = TextureWrapMode.Clamp;
-                ti.filterMode = FilterMode.Bilinear;
-                ti.textureCompression = TextureImporterCompression.Uncompressed;
-
-                var settings = new TextureImporterSettings();
-                ti.ReadTextureSettings(settings);
-                settings.spriteBorder = new Vector4(radius, radius, radius, radius);
-                settings.spriteMeshType = SpriteMeshType.FullRect;
-                settings.spriteGenerateFallbackPhysicsShape = false;
-                ti.SetTextureSettings(settings);
-                ti.SaveAndReimport();
-            }
-
-            return AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
         }
 
         private static void AddScenesToBuildSettings()
@@ -418,7 +607,9 @@ namespace Smartest.EditorTools
 
             go.AddComponent<NetSession>();
 
-            // Three audio channels the player can set independently.
+            // Three audio channels the player can set independently, and the one listener that
+            // hears them (the scene cameras have none, and this object outlives both scenes).
+            go.AddComponent<AudioListener>();
             var director = go.AddComponent<AudioDirector>();
             var narratorSource = MakeAudioChannel(go.transform, "Narrator");
             var musicSource = MakeAudioChannel(go.transform, "Music");
@@ -457,387 +648,94 @@ namespace Smartest.EditorTools
             return src;
         }
 
-        private static GameObject BuildPlayerRowPrefab(Sprite rounded)
-        {
-            var go = new GameObject("PlayerRow", typeof(RectTransform));
-            var bg = go.AddComponent<Image>();
-            bg.sprite = rounded;
-            bg.type = Image.Type.Sliced;
-            bg.color = Palette.PanelRaised;
-
-            var le = go.AddComponent<LayoutElement>();
-            le.preferredHeight = 52;
-            le.minHeight = 52;
-            le.flexibleWidth = 1;
-
-            var h = go.AddComponent<HorizontalLayoutGroup>();
-            h.padding = new RectOffset(18, 18, 6, 6);
-            h.spacing = 10;
-            h.childAlignment = TextAnchor.MiddleLeft;
-            h.childControlWidth = true;
-            h.childControlHeight = true;
-            h.childForceExpandWidth = false;
-            h.childForceExpandHeight = true;
-
-            var name = MakeText("Name", go.transform, "Player", 22, Palette.Text, TextAlignmentOptions.Left, FontStyles.Bold);
-            name.overflowMode = TextOverflowModes.Ellipsis;
-            var nameLe = name.gameObject.AddComponent<LayoutElement>();
-            nameLe.flexibleWidth = 1;
-            nameLe.minWidth = 40;
-
-            var tag = MakeText("Tag", go.transform, "HOST", 14, Palette.Accent, TextAlignmentOptions.Center, FontStyles.Bold);
-            var state = MakeText("State", go.transform, "thinking", 15, Palette.TextDim, TextAlignmentOptions.Right, FontStyles.Italic);
-            var delta = MakeText("Delta", go.transform, "+15", 20, Palette.Positive, TextAlignmentOptions.Right, FontStyles.Bold);
-            delta.gameObject.SetActive(false);
-            var score = MakeText("Score", go.transform, "0", 24, Palette.Text, TextAlignmentOptions.Right, FontStyles.Bold);
-
-            var view = go.AddComponent<PlayerRowView>();
-            SetPrivate(view, "background", bg);
-            SetPrivate(view, "nameText", name);
-            SetPrivate(view, "tagText", tag);
-            SetPrivate(view, "stateText", state);
-            SetPrivate(view, "deltaText", delta);
-            SetPrivate(view, "scoreText", score);
-
-            var prefab = PrefabUtility.SaveAsPrefabAsset(go, PlayerRowPrefabPath);
-            Object.DestroyImmediate(go);
-            return prefab;
-        }
-
-        private static GameObject BuildRevealRowPrefab(Sprite rounded)
-        {
-            var go = new GameObject("RevealRow", typeof(RectTransform));
-            var group = go.AddComponent<CanvasGroup>();
-            var bg = go.AddComponent<Image>();
-            bg.sprite = rounded;
-            bg.type = Image.Type.Sliced;
-            bg.color = Palette.PanelRaised;
-
-            var name = MakeText("Name", go.transform, "Player", 24, Palette.Text, TextAlignmentOptions.Left, FontStyles.Bold);
-            name.overflowMode = TextOverflowModes.Ellipsis;
-            Stretch(name.rectTransform, 24, 4, 380, 4);
-
-            var chip = new GameObject("Chip", typeof(RectTransform));
-            chip.transform.SetParent(go.transform, false);
-            var chipImg = chip.AddComponent<Image>();
-            chipImg.sprite = rounded;
-            chipImg.type = Image.Type.Sliced;
-            chipImg.color = Palette.Neutral;
-            var chipRt = chip.GetComponent<RectTransform>();
-            chipRt.anchorMin = chipRt.anchorMax = chipRt.pivot = new Vector2(0.5f, 0.5f);
-            chipRt.sizeDelta = new Vector2(150, 42);
-            chipRt.anchoredPosition = new Vector2(60f, 0f);
-            var chipText = MakeText("ChipText", chip.transform, "GREEN", 22, Palette.Text, TextAlignmentOptions.Center, FontStyles.Bold);
-            Stretch(chipText.rectTransform);
-
-            var note = MakeText("Note", go.transform, "WINNER", 13, Palette.Accent, TextAlignmentOptions.Right, FontStyles.Bold);
-            var noteRt = note.rectTransform;
-            noteRt.anchorMin = noteRt.anchorMax = new Vector2(1f, 0.5f);
-            noteRt.pivot = new Vector2(1f, 0.5f);
-            noteRt.sizeDelta = new Vector2(110, 40);
-            noteRt.anchoredPosition = new Vector2(-120f, 0f);
-            note.gameObject.SetActive(false);
-
-            var delta = MakeText("Delta", go.transform, "+10", 28, Palette.Positive, TextAlignmentOptions.Right, FontStyles.Bold);
-            var dRt = delta.rectTransform;
-            dRt.anchorMin = dRt.anchorMax = new Vector2(1f, 0.5f);
-            dRt.pivot = new Vector2(1f, 0.5f);
-            dRt.sizeDelta = new Vector2(100, 44);
-            dRt.anchoredPosition = new Vector2(-20f, 0f);
-
-            var view = go.AddComponent<RevealRowView>();
-            SetPrivate(view, "group", group);
-            SetPrivate(view, "nameText", name);
-            SetPrivate(view, "chipBackground", chipImg);
-            SetPrivate(view, "chipText", chipText);
-            SetPrivate(view, "deltaText", delta);
-            SetPrivate(view, "noteText", note);
-
-            var prefab = PrefabUtility.SaveAsPrefabAsset(go, RevealRowPrefabPath);
-            Object.DestroyImmediate(go);
-            return prefab;
-        }
-
         // ------------------------------------------------------------------
         // Menu scene
         // ------------------------------------------------------------------
 
-        private static void BuildMenuScene(Sprite rounded, GameConfig config, GameObject playerRowPrefab)
+        private static void BuildMenuScene(GameConfig config)
         {
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             AddCamera();
             var canvas = CreateCanvas();
             CreateEventSystem();
             CreateBackground(canvas.transform);
+            var frame = CreateFrame(canvas.transform);
 
-            var main = MakePanel<Panel>("MainMenuPanel", canvas.transform, new Vector2(760, 820), Vector2.zero, rounded, config);
-            PlaceTop(MakeText("Title", main.transform, "SMARTEST\nIN THE ROOM", 58, Palette.Accent, TextAlignmentOptions.Top, FontStyles.Bold).rectTransform, 44, new Vector2(700, 160));
-            PlaceTop(MakeText("Subtitle", main.transform, "First to 100 points is the smartest in the group.", 22, Palette.TextDim, TextAlignmentOptions.Top).rectTransform, 210, new Vector2(680, 40));
-            var nameField = MakeInputField("NameField", main.transform, "Your name", 12, TMP_InputField.ContentType.Standard, rounded);
-            PlaceTop(nameField.GetComponent<RectTransform>(), 290, new Vector2(560, 72));
-            var hostBtn = MakeButton("HostButton", main.transform, "HOST", new Vector2(560, 84), Palette.Accent, Palette.TextOnAccent, rounded);
-            PlaceTop(hostBtn.GetComponent<RectTransform>(), 400, new Vector2(560, 84));
-            var joinBtn = MakeButton("JoinButton", main.transform, "JOIN", new Vector2(560, 84), Palette.PanelRaised, Palette.Text, rounded);
-            PlaceTop(joinBtn.GetComponent<RectTransform>(), 504, new Vector2(560, 84));
-            var quitBtn = MakeButton("QuitButton", main.transform, "QUIT", new Vector2(560, 68), Palette.PanelRaised, Palette.TextDim, rounded);
-            PlaceTop(quitBtn.GetComponent<RectTransform>(), 608, new Vector2(560, 68));
-            var mainStatus = MakeText("Status", main.transform, "", 20, Palette.Accent, TextAlignmentOptions.Top);
-            PlaceTop(mainStatus.rectTransform, 692, new Vector2(680, 44));
-            PlaceTop(MakeText("Footer", main.transform, "No in-game chat. Talk on Discord.", 18, Palette.TextDim, TextAlignmentOptions.Top).rectTransform, 748, new Vector2(680, 30));
-
-            var join = MakePanel<Panel>("JoinPanel", canvas.transform, new Vector2(600, 540), Vector2.zero, rounded, config);
-            PlaceTop(MakeText("JoinTitle", join.transform, "JOIN A GAME", 40, Palette.Accent, TextAlignmentOptions.Top, FontStyles.Bold).rectTransform, 44, new Vector2(540, 60));
-            // Accepts a Relay code, a host's LAN IP, or LOCAL — so it must allow dots and be long.
-            var codeField = MakeInputField("CodeField", join.transform, "CODE OR IP", 24, TMP_InputField.ContentType.Standard, rounded, 30, true);
-            PlaceTop(codeField.GetComponent<RectTransform>(), 140, new Vector2(460, 88));
-            var goBtn = MakeButton("JoinGoButton", join.transform, "GO", new Vector2(460, 76), Palette.Accent, Palette.TextOnAccent, rounded);
-            PlaceTop(goBtn.GetComponent<RectTransform>(), 252, new Vector2(460, 76));
-            var joinBackBtn = MakeButton("JoinBackButton", join.transform, "BACK", new Vector2(460, 60), Palette.PanelRaised, Palette.TextDim, rounded);
-            PlaceTop(joinBackBtn.GetComponent<RectTransform>(), 340, new Vector2(460, 60));
-            PlaceTop(MakeText("JoinHint", join.transform,
-                "The host's code, or their IP on the same Wi-Fi.\nType LOCAL for a second instance on this PC.",
-                17, Palette.TextDim, TextAlignmentOptions.Top).rectTransform, 414, new Vector2(540, 56));
-            var joinStatus = MakeText("Status", join.transform, "", 18, Palette.Accent, TextAlignmentOptions.Top);
-            PlaceTop(joinStatus.rectTransform, 476, new Vector2(540, 44));
-
-            var lobby = MakePanel<LobbyUI>("LobbyPanel", canvas.transform, new Vector2(760, 900), Vector2.zero, rounded, config);
-            PlaceTop(MakeText("LobbyTitle", lobby.transform, "LOBBY", 30, Palette.TextDim, TextAlignmentOptions.Top, FontStyles.Bold).rectTransform, 34, new Vector2(680, 40));
-            var codeText = MakeText("SessionCode", lobby.transform, "----", 72, Palette.Accent, TextAlignmentOptions.Top, FontStyles.Bold);
-            codeText.characterSpacing = 18;
-            PlaceTop(codeText.rectTransform, 82, new Vector2(560, 96));
-            var copyBtn = MakeButton("CopyButton", lobby.transform, "COPY", new Vector2(120, 52), Palette.PanelRaised, Palette.Text, rounded);
-            PlaceTop(copyBtn.GetComponent<RectTransform>(), 104, new Vector2(120, 52)).anchoredPosition = new Vector2(300, -104);
-            var modeText = MakeText("Mode", lobby.transform, "Share this code on Discord", 18, Palette.TextDim, TextAlignmentOptions.Top);
-            PlaceTop(modeText.rectTransform, 184, new Vector2(680, 30));
-            var rows = MakeRowsContainer("Rows", lobby.transform, 6f, true);
-            PlaceTop(rows, 232, new Vector2(620, 458));
-            var hint = MakeText("Hint", lobby.transform, "Waiting for host…", 20, Palette.TextDim, TextAlignmentOptions.Top);
-            PlaceTop(hint.rectTransform, 700, new Vector2(680, 30));
-            var startBtn = MakeButton("StartButton", lobby.transform, "START", new Vector2(560, 84), Palette.Accent, Palette.TextOnAccent, rounded);
-            PlaceTop(startBtn.GetComponent<RectTransform>(), 742, new Vector2(560, 84));
-            var leaveBtn = MakeButton("LeaveButton", lobby.transform, "LEAVE", new Vector2(560, 60), Palette.PanelRaised, Palette.TextDim, rounded);
-            PlaceTop(leaveBtn.GetComponent<RectTransform>(), 834, new Vector2(560, 60));
-
-            var rowView = playerRowPrefab.GetComponent<PlayerRowView>();
-            SetPrivate(lobby, "codeText", codeText);
-            SetPrivate(lobby, "modeText", modeText);
-            SetPrivate(lobby, "copyButton", copyBtn);
-            SetPrivate(lobby, "rowsContainer", rows);
-            SetPrivate(lobby, "rowPrefab", rowView);
-            SetPrivate(lobby, "hintText", hint);
-            SetPrivate(lobby, "startButton", startBtn);
-            SetPrivate(lobby, "leaveButton", leaveBtn);
-
-            // Sound settings, built last so it sits above the menu and the lobby.
-            BuildSettingsPanel(canvas.transform, rounded, config);
-
-            var menu = new GameObject("MenuController").AddComponent<MenuUI>();
-            SetPrivate(menu, "mainPanel", main);
-            SetPrivate(menu, "joinPanel", join);
-            SetPrivate(menu, "lobby", lobby);
-            SetPrivate(menu, "nameField", nameField);
-            SetPrivate(menu, "hostButton", hostBtn);
-            SetPrivate(menu, "joinButton", joinBtn);
-            SetPrivate(menu, "quitButton", quitBtn);
-            SetPrivate(menu, "mainStatus", mainStatus);
-            SetPrivate(menu, "codeField", codeField);
-            SetPrivate(menu, "joinGoButton", goBtn);
-            SetPrivate(menu, "joinBackButton", joinBackBtn);
-            SetPrivate(menu, "joinStatus", joinStatus);
+            var settings = SettingsPanel.Create(frame, config);
+            var lobby = LobbyUI.Create(frame, config, settings);
+            CountChallenges(out int social, out int minigames);
+            MenuUI.Create(frame, config, settings, lobby, social, minigames);
+            HostCaption.Create(frame, 48f, 930f, 1060f); // clear of the play card
+            settings.transform.SetAsLastSibling(); // the modal sits above everything
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, MenuScenePath);
+        }
+
+        private static void CountChallenges(out int social, out int minigames)
+        {
+            social = 0;
+            minigames = 0;
+            foreach (var spec in RoundCatalog.AllChallenges())
+            {
+                if (spec.Kind == RoundKind.Minigame) minigames++;
+                else social++;
+            }
         }
 
         // ------------------------------------------------------------------
         // Game scene
         // ------------------------------------------------------------------
 
-        private static void BuildGameScene(Sprite rounded, GameConfig config,
-            GameObject playerRowPrefab, GameObject revealRowPrefab)
+        private static void BuildGameScene(GameConfig config)
         {
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             AddCamera();
             var canvas = CreateCanvas();
             CreateEventSystem();
             CreateBackground(canvas.transform);
+            var frame = CreateFrame(canvas.transform);
 
             // (GameState is a network prefab spawned by the host after everyone loads this scene — see NetSession.)
 
-            // --- Round counter (top-left, above the scoreboard) ---
-            var counter = MakeText("RoundCounter", canvas.transform, "ROUND 1", 22, Palette.TextDim, TextAlignmentOptions.Left, FontStyles.Bold);
-            var cRt = counter.rectTransform;
-            cRt.anchorMin = cRt.anchorMax = new Vector2(0f, 1f);
-            cRt.pivot = new Vector2(0f, 1f);
-            cRt.sizeDelta = new Vector2(380, 36);
-            cRt.anchoredPosition = new Vector2(48f, -14f);
+            var settings = SettingsPanel.Create(frame, config);
 
-            // --- Scoreboard (left column, always visible) ---
-            var board = MakePanel<Panel>("ScoreboardPanel", canvas.transform, new Vector2(380, 960), Vector2.zero, rounded, config);
-            var boardRt = board.GetComponent<RectTransform>();
-            boardRt.anchorMin = boardRt.anchorMax = new Vector2(0f, 0.5f);
-            boardRt.pivot = new Vector2(0f, 0.5f);
-            boardRt.anchoredPosition = new Vector2(40f, -10f);
-            PlaceTop(MakeText("BoardTitle", board.transform, "SCOREBOARD", 26, Palette.Accent, TextAlignmentOptions.Top, FontStyles.Bold).rectTransform, 28, new Vector2(320, 40));
-            var boardRows = MakeRowsContainer("Rows", board.transform, 8f, false);
-            PlaceTop(boardRows, 84, new Vector2(340, 840));
-            var scoreboard = board.gameObject.AddComponent<ScoreboardUI>();
-            SetPrivate(scoreboard, "rowsContainer", boardRows);
-            SetPrivate(scoreboard, "rowPrefab", playerRowPrefab.GetComponent<PlayerRowView>());
+            // Everything that stays up for the whole match, in one group the winner page can hide.
+            var hudRoot = Ink.Node(frame, "Hud");
+            hudRoot.Fill();
+            var hud = hudRoot.gameObject.AddComponent<CanvasGroup>();
 
-            // --- Round panel ---
-            // Layout order is deliberate: question, then what each choice actually does,
-            // then the buttons. The buttons carry only the word you're choosing.
-            var round = MakePanel<RoundPanel>("RoundPanel", canvas.transform, new Vector2(1040, 740), new Vector2(120, 0), rounded, config);
-            var rTitle = MakeText("RoundTitle", round.transform, "THE BUTTON", 30, Palette.Accent, TextAlignmentOptions.Top, FontStyles.Bold);
-            PlaceTop(rTitle.rectTransform, 26, new Vector2(940, 38));
-            var tie = MakeText("Tie", round.transform, "TIE. ONE MORE.", 20, Palette.Red, TextAlignmentOptions.Top, FontStyles.Bold);
-            PlaceTop(tie.rectTransform, 8, new Vector2(300, 28)).anchoredPosition = new Vector2(320f, -14f);
-            tie.gameObject.SetActive(false);
-            var prompt = MakeText("Prompt", round.transform, "Everyone presses green?", 42, Palette.Text, TextAlignmentOptions.Top, FontStyles.Bold);
-            PlaceTop(prompt.rectTransform, 68, new Vector2(920, 96));
+            var masthead = Masthead.Create(hudRoot, config, settings);
 
-            var rules = MakeText("Rules", round.transform, "", 21, Palette.Text, TextAlignmentOptions.TopLeft);
-            rules.lineSpacing = 14f;
-            PlaceTop(rules.rectTransform, 172, new Vector2(900, 118));
+            // The stage: x 48–1872, y 150–762. The round, the minigame and the reveal take turns.
+            var stage = Ink.Node(hudRoot, "Stage");
+            stage.At(48f, 150f, RoundPanel.Width, RoundPanel.Height);
+            var round = RoundPanel.Create(stage, config);
+            var minigame = MinigameStage.Create(stage, config);
+            var reveal = RevealPanel.Create(stage, config);
 
-            var sub = MakeText("SubLine", round.transform, "", 19, Palette.TextDim, TextAlignmentOptions.Top);
-            PlaceTop(sub.rectTransform, 294, new Vector2(920, 34));
+            var caption = HostCaption.Create(hudRoot, 48f, 774f);
+            var rail = SeatRail.Create(hudRoot, 48f, 856f, masthead.Race);
 
-            var buttonA = MakeAnswerButton("ButtonA", round.transform, new Vector2(440, 200), rounded, 48);
-            PlaceTop(buttonA.GetComponent<RectTransform>(), 336, new Vector2(440, 200)).anchoredPosition = new Vector2(-236f, -336f);
-            var buttonB = MakeAnswerButton("ButtonB", round.transform, new Vector2(440, 200), rounded, 48);
-            PlaceTop(buttonB.GetComponent<RectTransform>(), 336, new Vector2(440, 200)).anchoredPosition = new Vector2(236f, -336f);
+            var winner = WinnerPanel.Create(frame, config, settings);
+            settings.transform.SetAsLastSibling();
 
-            var grid = new GameObject("NumberGrid", typeof(RectTransform)).GetComponent<RectTransform>();
-            grid.SetParent(round.transform, false);
-            PlaceTop(grid, 336, new Vector2(700, 190));
-            var gl = grid.gameObject.AddComponent<GridLayoutGroup>();
-            gl.cellSize = new Vector2(120, 82);
-            gl.spacing = new Vector2(14, 14);
-            gl.startCorner = GridLayoutGroup.Corner.UpperLeft;
-            gl.startAxis = GridLayoutGroup.Axis.Horizontal;
-            gl.childAlignment = TextAnchor.UpperCenter;
-            gl.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            gl.constraintCount = 5;
-            var numberButtons = new Object[11];
-            for (int v = 1; v <= 10; v++)
-                numberButtons[v] = MakeAnswerButton("Num" + v, grid, new Vector2(120, 82), rounded, 34);
-            numberButtons[0] = MakeAnswerButton("Num0", grid, new Vector2(120, 82), rounded, 34);
-
-            var lockedHint = MakeText("LockedHint", round.transform, "Locked in. No takebacks.", 20, Palette.LockedIn, TextAlignmentOptions.Top, FontStyles.Bold);
-            PlaceTop(lockedHint.rectTransform, 596, new Vector2(900, 30));
-            lockedHint.gameObject.SetActive(false);
-
-            var countdown = MakeCountdown("Countdown", round.transform, rounded);
-            PlaceTop(countdown.GetComponent<RectTransform>(), 690, new Vector2(920, 18));
-
-            SetPrivate(round, "titleText", rTitle);
-            SetPrivate(round, "promptText", prompt);
-            SetPrivate(round, "rulesText", rules);
-            SetPrivate(round, "subLineText", sub);
-            SetPrivate(round, "tieText", tie);
-            SetPrivate(round, "lockedHint", lockedHint);
-            SetPrivate(round, "buttonA", buttonA);
-            SetPrivate(round, "buttonB", buttonB);
-            SetPrivate(round, "numberGrid", grid);
-            SetPrivateArray(round, "numberButtons", numberButtons);
-            SetPrivate(round, "countdown", countdown);
-
-            // --- Minigame stage ---
-            // Same panel size, same chrome positions as the round panel, so switching
-            // between a question and a minigame doesn't move the furniture. Everything in
-            // the middle is drawn at runtime by the minigame itself, through UiKit.
-            var stage = MakePanel<MinigameStage>("MinigameStage", canvas.transform, new Vector2(1040, 740), new Vector2(120, 0), rounded, config);
-            var mTitle = MakeText("StageTitle", stage.transform, "GREEN LIGHT", 30, Palette.Accent, TextAlignmentOptions.Top, FontStyles.Bold);
-            PlaceTop(mTitle.rectTransform, 26, new Vector2(940, 38));
-            var mLevel = MakeText("Level", stage.transform, "LEVEL 1", 22, Palette.Text, TextAlignmentOptions.TopLeft, FontStyles.Bold);
-            PlaceTop(mLevel.rectTransform, 28, new Vector2(240, 32)).anchoredPosition = new Vector2(-380f, -28f);
-            var mAlive = MakeText("Alive", stage.transform, "4 LEFT", 22, Palette.TextDim, TextAlignmentOptions.TopRight, FontStyles.Bold);
-            PlaceTop(mAlive.rectTransform, 28, new Vector2(240, 32)).anchoredPosition = new Vector2(380f, -28f);
-            var mRule = MakeText("StageRule", stage.transform, "", 22, Palette.Text, TextAlignmentOptions.Top);
-            PlaceTop(mRule.rectTransform, 74, new Vector2(900, 64));
-
-            var content = new GameObject("Content", typeof(RectTransform)).GetComponent<RectTransform>();
-            content.SetParent(stage.transform, false);
-            content.anchorMin = content.anchorMax = content.pivot = new Vector2(0.5f, 0.5f);
-            content.sizeDelta = new Vector2(940, 440);
-            content.anchoredPosition = new Vector2(0f, -10f);
-
-            var mBig = MakeText("BigCount", stage.transform, "", 120, Palette.Text, TextAlignmentOptions.Center, FontStyles.Bold);
-            var bigRt = mBig.rectTransform;
-            bigRt.anchorMin = bigRt.anchorMax = bigRt.pivot = new Vector2(0.5f, 0.5f);
-            bigRt.sizeDelta = new Vector2(400, 160);
-            bigRt.anchoredPosition = new Vector2(0f, -20f);
-
-            var mStatus = MakeText("Status", stage.transform, "", 24, Palette.Accent, TextAlignmentOptions.Top, FontStyles.Bold);
-            PlaceTop(mStatus.rectTransform, 618, new Vector2(900, 34));
-            var mControls = MakeText("Controls", stage.transform, "SPACE", 20, Palette.TextDim, TextAlignmentOptions.Top);
-            PlaceTop(mControls.rectTransform, 654, new Vector2(900, 28));
-            var mCountdown = MakeCountdown("StageCountdown", stage.transform, rounded);
-            PlaceTop(mCountdown.GetComponent<RectTransform>(), 690, new Vector2(920, 18));
-
-            SetPrivate(stage, "titleText", mTitle);
-            SetPrivate(stage, "ruleText", mRule);
-            SetPrivate(stage, "levelText", mLevel);
-            SetPrivate(stage, "aliveText", mAlive);
-            SetPrivate(stage, "statusText", mStatus);
-            SetPrivate(stage, "controlsText", mControls);
-            SetPrivate(stage, "bigCountText", mBig);
-            SetPrivate(stage, "contentArea", content);
-            SetPrivate(stage, "countdown", mCountdown);
-            SetPrivate(stage, "panelSprite", rounded);
-
-            // --- Reveal panel ---
-            var reveal = MakePanel<RevealPanel>("RevealPanel", canvas.transform, new Vector2(1040, 740), new Vector2(120, 0), rounded, config);
-            var rvTitle = MakeText("RevealTitle", reveal.transform, "REVEAL", 30, Palette.Accent, TextAlignmentOptions.Top, FontStyles.Bold);
-            PlaceTop(rvTitle.rectTransform, 30, new Vector2(940, 40));
-            var rvRows = MakeRowsContainer("Rows", reveal.transform, 8f, false);
-            PlaceTop(rvRows, 90, new Vector2(820, 486));
-            var reaction = MakeText("Reaction", reveal.transform, "", 26, Palette.TextDim, TextAlignmentOptions.Bottom, FontStyles.Italic);
-            PlaceTop(reaction.rectTransform, 596, new Vector2(900, 90));
-            SetPrivate(reveal, "titleText", rvTitle);
-            SetPrivate(reveal, "rowsContainer", rvRows);
-            SetPrivate(reveal, "rowPrefab", revealRowPrefab.GetComponent<RevealRowView>());
-            SetPrivate(reveal, "reactionText", reaction);
-
-            // --- Winner panel ---
-            var winner = MakePanel<WinnerPanel>("WinnerPanel", canvas.transform, new Vector2(1040, 740), new Vector2(120, 0), rounded, config);
-            var wLabel = MakeText("WinnerLabel", winner.transform, "SMARTEST IN THE GROUP", 40, Palette.Accent, TextAlignmentOptions.Top, FontStyles.Bold);
-            PlaceTop(wLabel.rectTransform, 70, new Vector2(940, 60));
-            var wName = MakeText("WinnerName", winner.transform, "—", 84, Palette.Text, TextAlignmentOptions.Top, FontStyles.Bold);
-            PlaceTop(wName.rectTransform, 140, new Vector2(940, 110));
-            var standings = MakeText("Standings", winner.transform, "", 24, Palette.TextDim, TextAlignmentOptions.Top);
-            PlaceTop(standings.rectTransform, 280, new Vector2(700, 260));
-            var backBtn = MakeButton("BackToLobbyButton", winner.transform, "BACK TO LOBBY", new Vector2(420, 76), Palette.Accent, Palette.TextOnAccent, rounded);
-            PlaceTop(backBtn.GetComponent<RectTransform>(), 590, new Vector2(420, 76));
-            var waiting = MakeText("Waiting", winner.transform, "Waiting for host…", 22, Palette.TextDim, TextAlignmentOptions.Top);
-            PlaceTop(waiting.rectTransform, 610, new Vector2(700, 40));
-            SetPrivate(winner, "labelText", wLabel);
-            SetPrivate(winner, "nameText", wName);
-            SetPrivate(winner, "standingsText", standings);
-            SetPrivate(winner, "backButton", backBtn);
-            SetPrivate(winner, "waitingText", waiting);
-
-            // --- Sound settings (built last so it sits above every other panel) ---
-            BuildSettingsPanel(canvas.transform, rounded, config);
-
-            // --- Controller ---
             var ui = new GameObject("GameController").AddComponent<GameUI>();
-            SetPrivate(ui, "scoreboardPanel", board);
-            SetPrivate(ui, "scoreboard", scoreboard);
+            SetPrivate(ui, "hud", hud);
+            SetPrivate(ui, "masthead", masthead);
+            SetPrivate(ui, "seatRail", rail);
+            SetPrivate(ui, "hostCaption", caption);
             SetPrivate(ui, "roundPanel", round);
-            SetPrivate(ui, "minigameStage", stage);
+            SetPrivate(ui, "minigameStage", minigame);
             SetPrivate(ui, "revealPanel", reveal);
             SetPrivate(ui, "winnerPanel", winner);
-            SetPrivate(ui, "roundCounter", counter);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, GameScenePath);
         }
 
         // ------------------------------------------------------------------
-        // UI construction helpers
+        // Scene plumbing
         // ------------------------------------------------------------------
 
         private static void AddCamera()
@@ -846,10 +744,15 @@ namespace Smartest.EditorTools
             camGo.tag = "MainCamera";
             var cam = camGo.GetComponent<Camera>();
             cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = Palette.Background;
+            cam.backgroundColor = Palette.Paper;
             cam.orthographic = true;
         }
 
+        /// <summary>
+        /// Screen Space Overlay at 1920 × 1080, set to Expand: the canvas is never smaller than
+        /// the design in either direction, so a 16:10 or ultrawide screen gets extra paper around
+        /// the page instead of a page that runs off the edge.
+        /// </summary>
         private static Canvas CreateCanvas()
         {
             var go = new GameObject("Canvas", typeof(RectTransform));
@@ -858,10 +761,20 @@ namespace Smartest.EditorTools
             var scaler = go.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(RefW, RefH);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
+            scaler.referencePixelsPerUnit = 100f;
             go.AddComponent<GraphicRaycaster>();
             return canvas;
+        }
+
+        /// <summary>The 1920 × 1080 page every layout is written against, centred on the canvas.</summary>
+        private static RectTransform CreateFrame(Transform canvas)
+        {
+            var rt = Ink.Node(canvas, "Frame");
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(RefW, RefH);
+            rt.anchoredPosition = Vector2.zero;
+            return rt;
         }
 
         private static void CreateEventSystem()
@@ -876,357 +789,15 @@ namespace Smartest.EditorTools
 
         private static void CreateBackground(Transform canvas)
         {
-            var go = new GameObject("Background", typeof(RectTransform));
-            go.transform.SetParent(canvas, false);
-            var img = go.AddComponent<Image>();
-            img.color = Palette.Background;
+            var img = Ink.Node(canvas, "Background").gameObject.AddComponent<Image>();
+            img.color = Palette.Paper;
             img.raycastTarget = false;
-            Stretch(go.GetComponent<RectTransform>());
-        }
-
-        private static T MakePanel<T>(string name, Transform parent, Vector2 size, Vector2 centerOffset,
-            Sprite sprite, GameConfig config) where T : Panel
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            go.AddComponent<CanvasGroup>();
-            var img = go.AddComponent<Image>();
-            img.sprite = sprite;
-            img.type = Image.Type.Sliced;
-            img.color = Palette.Panel;
-            var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = size;
-            rt.anchoredPosition = centerOffset;
-            var panel = go.AddComponent<T>();
-            panel.ApplyConfig(config);
-            return panel;
-        }
-
-        private static TextMeshProUGUI MakeText(string name, Transform parent, string text, float size,
-            Color color, TextAlignmentOptions align, FontStyles style = FontStyles.Normal)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var t = go.AddComponent<TextMeshProUGUI>();
-            t.text = text;
-            t.fontSize = size;
-            t.color = color;
-            t.alignment = align;
-            t.fontStyle = style;
-            t.raycastTarget = false;
-            t.richText = true;
-            return t;
-        }
-
-        private static Button MakeButton(string name, Transform parent, string label, Vector2 size,
-            Color bg, Color textColor, Sprite sprite, float fontSize = 0f)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var img = go.AddComponent<Image>();
-            img.sprite = sprite;
-            img.type = Image.Type.Sliced;
-            img.color = bg;
-            var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = size;
-
-            var btn = go.AddComponent<Button>();
-            btn.targetGraphic = img;
-            var colors = ColorBlock.defaultColorBlock;
-            colors.normalColor = new Color(0.94f, 0.94f, 0.94f, 1f);
-            colors.highlightedColor = Color.white;
-            colors.pressedColor = new Color(0.78f, 0.78f, 0.78f, 1f);
-            colors.selectedColor = new Color(0.94f, 0.94f, 0.94f, 1f);
-            colors.disabledColor = new Color(0.55f, 0.55f, 0.55f, 0.7f);
-            colors.fadeDuration = 0.08f;
-            btn.colors = colors;
-
-            float fs = fontSize > 0f ? fontSize : (size.y > 120 ? 40 : 26);
-            var text = MakeText("Label", go.transform, label, fs, textColor, TextAlignmentOptions.Center, FontStyles.Bold);
-            Stretch(text.rectTransform, 10, 8, 10, 8);
-            return btn;
-        }
-
-        private static AnswerButton MakeAnswerButton(string name, Transform parent, Vector2 size, Sprite sprite, float fontSize)
-        {
-            var btn = MakeButton(name, parent, "", size, Palette.Neutral, Palette.Text, sprite, fontSize);
-            var go = btn.gameObject;
-            var group = go.AddComponent<CanvasGroup>();
-            var label = go.GetComponentInChildren<TextMeshProUGUI>();
-
-            var check = MakeText("Check", go.transform, "✓", Mathf.Max(26f, fontSize * 0.8f), Palette.Text, TextAlignmentOptions.Center, FontStyles.Bold);
-            var chk = check.rectTransform;
-            chk.anchorMin = chk.anchorMax = new Vector2(1f, 1f);
-            chk.pivot = new Vector2(1f, 1f);
-            chk.sizeDelta = new Vector2(44, 44);
-            chk.anchoredPosition = new Vector2(-6f, -4f);
-            check.gameObject.SetActive(false);
-
-            var ab = go.AddComponent<AnswerButton>();
-            SetPrivate(ab, "button", btn);
-            SetPrivate(ab, "background", go.GetComponent<Image>());
-            SetPrivate(ab, "label", label);
-            SetPrivate(ab, "checkMark", check);
-            SetPrivate(ab, "group", group);
-            return ab;
-        }
-
-        /// <summary>A standard Unity slider, built from the same rounded sprite as everything else.</summary>
-        private static Slider MakeSlider(string name, Transform parent, Sprite sprite, Vector2 size)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var rt = go.GetComponent<RectTransform>();
-            rt.sizeDelta = size;
-
-            var bg = new GameObject("Background", typeof(RectTransform));
-            bg.transform.SetParent(go.transform, false);
-            var bgImg = bg.AddComponent<Image>();
-            bgImg.sprite = sprite;
-            bgImg.type = Image.Type.Sliced;
-            bgImg.color = Palette.Neutral;
-            var bgRt = bg.GetComponent<RectTransform>();
-            bgRt.anchorMin = new Vector2(0f, 0.5f);
-            bgRt.anchorMax = new Vector2(1f, 0.5f);
-            bgRt.pivot = new Vector2(0.5f, 0.5f);
-            bgRt.sizeDelta = new Vector2(0f, 14f);
-            bgRt.anchoredPosition = Vector2.zero;
-
-            var fillArea = new GameObject("Fill Area", typeof(RectTransform));
-            fillArea.transform.SetParent(go.transform, false);
-            var faRt = fillArea.GetComponent<RectTransform>();
-            faRt.anchorMin = new Vector2(0f, 0.5f);
-            faRt.anchorMax = new Vector2(1f, 0.5f);
-            faRt.pivot = new Vector2(0.5f, 0.5f);
-            faRt.sizeDelta = new Vector2(-24f, 14f);
-            faRt.anchoredPosition = Vector2.zero;
-
-            var fill = new GameObject("Fill", typeof(RectTransform));
-            fill.transform.SetParent(fillArea.transform, false);
-            var fillImg = fill.AddComponent<Image>();
-            fillImg.sprite = sprite;
-            fillImg.type = Image.Type.Sliced;
-            fillImg.color = Palette.Accent;
-            var fillRt = fill.GetComponent<RectTransform>();
-            fillRt.anchorMin = Vector2.zero;
-            fillRt.anchorMax = Vector2.one;
-            fillRt.sizeDelta = new Vector2(12f, 0f);
-            fillRt.anchoredPosition = Vector2.zero;
-
-            var handleArea = new GameObject("Handle Slide Area", typeof(RectTransform));
-            handleArea.transform.SetParent(go.transform, false);
-            var haRt = handleArea.GetComponent<RectTransform>();
-            haRt.anchorMin = Vector2.zero;
-            haRt.anchorMax = Vector2.one;
-            haRt.sizeDelta = new Vector2(-24f, 0f);
-            haRt.anchoredPosition = Vector2.zero;
-
-            var handle = new GameObject("Handle", typeof(RectTransform));
-            handle.transform.SetParent(handleArea.transform, false);
-            var handleImg = handle.AddComponent<Image>();
-            handleImg.sprite = sprite;
-            handleImg.type = Image.Type.Sliced;
-            handleImg.color = Palette.Text;
-            var hRt = handle.GetComponent<RectTransform>();
-            hRt.sizeDelta = new Vector2(24f, 36f);
-
-            var slider = go.AddComponent<Slider>();
-            slider.fillRect = fillRt;
-            slider.handleRect = hRt;
-            slider.targetGraphic = handleImg;
-            slider.direction = Slider.Direction.LeftToRight;
-            slider.minValue = 0f;
-            slider.maxValue = 1f;
-            slider.wholeNumbers = false;
-            slider.value = 1f;
-            return slider;
-        }
-
-        /// <summary>
-        /// The sound settings, plus the small button that opens them. Identical in both
-        /// scenes — the panel is built last so it sits on top of everything else.
-        /// </summary>
-        private static SettingsPanel BuildSettingsPanel(Transform canvas, Sprite rounded, GameConfig config)
-        {
-            var open = MakeButton("SoundButton", canvas, "SOUND", new Vector2(132, 52),
-                Palette.PanelRaised, Palette.TextDim, rounded, 20);
-            var openRt = open.GetComponent<RectTransform>();
-            openRt.anchorMin = openRt.anchorMax = openRt.pivot = new Vector2(1f, 1f);
-            openRt.anchoredPosition = new Vector2(-28f, -20f);
-
-            var panel = MakePanel<SettingsPanel>("SettingsPanel", canvas, new Vector2(620, 560), Vector2.zero, rounded, config);
-            var title = MakeText("SettingsTitle", panel.transform, "SOUND", 30, Palette.Accent, TextAlignmentOptions.Top, FontStyles.Bold);
-            PlaceTop(title.rectTransform, 28, new Vector2(520, 40));
-
-            string[] labels = { "EVERYTHING", "HOST VOICE", "MUSIC", "SOUND EFFECTS" };
-            var sliders = new Slider[4];
-            var values = new TextMeshProUGUI[4];
-            for (int i = 0; i < 4; i++)
-            {
-                float y = 96f + i * 92f;
-                var label = MakeText("Label" + i, panel.transform, labels[i], 20, Palette.TextDim, TextAlignmentOptions.TopLeft, FontStyles.Bold);
-                PlaceTop(label.rectTransform, y, new Vector2(500, 28));
-                values[i] = MakeText("Value" + i, panel.transform, "100%", 20, Palette.Text, TextAlignmentOptions.TopRight, FontStyles.Bold);
-                PlaceTop(values[i].rectTransform, y, new Vector2(500, 28));
-                sliders[i] = MakeSlider("Slider" + i, panel.transform, rounded, new Vector2(500, 38));
-                PlaceTop(sliders[i].GetComponent<RectTransform>(), y + 30f, new Vector2(500, 38));
-            }
-
-            var hint = MakeText("MusicHint", panel.transform, "No music yet — drop a loop into Audio/Music and rebuild.",
-                16, Palette.TextDim, TextAlignmentOptions.Top);
-            PlaceTop(hint.rectTransform, 450, new Vector2(540, 28));
-
-            var close = MakeButton("CloseSettings", panel.transform, "DONE", new Vector2(240, 66),
-                Palette.Accent, Palette.TextOnAccent, rounded);
-            PlaceTop(close.GetComponent<RectTransform>(), 478, new Vector2(240, 66));
-
-            SetPrivate(panel, "masterSlider", sliders[0]);
-            SetPrivate(panel, "narratorSlider", sliders[1]);
-            SetPrivate(panel, "musicSlider", sliders[2]);
-            SetPrivate(panel, "sfxSlider", sliders[3]);
-            SetPrivate(panel, "masterValue", values[0]);
-            SetPrivate(panel, "narratorValue", values[1]);
-            SetPrivate(panel, "musicValue", values[2]);
-            SetPrivate(panel, "sfxValue", values[3]);
-            SetPrivate(panel, "musicHint", hint);
-            SetPrivate(panel, "closeButton", close);
-            SetPrivate(panel, "openButton", open);
-            return panel;
-        }
-
-        private static CountdownBar MakeCountdown(string name, Transform parent, Sprite sprite)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var track = go.AddComponent<Image>();
-            track.sprite = sprite;
-            track.type = Image.Type.Sliced;
-            track.color = Palette.PanelRaised;
-            var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 1f);
-
-            var fillGo = new GameObject("Fill", typeof(RectTransform));
-            fillGo.transform.SetParent(go.transform, false);
-            var fill = fillGo.AddComponent<Image>();
-            fill.sprite = sprite;
-            fill.type = Image.Type.Sliced;
-            fill.color = Palette.TextDim;
-            var fillRt = fillGo.GetComponent<RectTransform>();
-            fillRt.anchorMin = new Vector2(0f, 0f);
-            fillRt.anchorMax = new Vector2(1f, 1f);
-            fillRt.pivot = new Vector2(0f, 0.5f);
-            fillRt.offsetMin = Vector2.zero;
-            fillRt.offsetMax = Vector2.zero;
-
-            var numeric = MakeText("Numeric", go.transform, "", 30, Palette.Accent, TextAlignmentOptions.Center, FontStyles.Bold);
-            var nRt = numeric.rectTransform;
-            nRt.anchorMin = nRt.anchorMax = new Vector2(0.5f, 1f);
-            nRt.pivot = new Vector2(0.5f, 0f);
-            nRt.sizeDelta = new Vector2(120, 40);
-            nRt.anchoredPosition = new Vector2(0f, 8f);
-
-            var bar = go.AddComponent<CountdownBar>();
-            SetPrivate(bar, "fill", fillRt);
-            SetPrivate(bar, "fillImage", fill);
-            SetPrivate(bar, "numeric", numeric);
-            return bar;
-        }
-
-        private static TMP_InputField MakeInputField(string name, Transform parent, string placeholder, int charLimit,
-            TMP_InputField.ContentType contentType, Sprite sprite, float fontSize = 26f, bool centered = false)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var bg = go.AddComponent<Image>();
-            bg.sprite = sprite;
-            bg.type = Image.Type.Sliced;
-            bg.color = Palette.PanelRaised;
-            var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
-
-            var input = go.AddComponent<TMP_InputField>();
-            input.targetGraphic = bg;
-
-            var area = new GameObject("Text Area", typeof(RectTransform));
-            area.transform.SetParent(go.transform, false);
-            var areaRt = area.GetComponent<RectTransform>();
-            Stretch(areaRt, 20, 8, 20, 8);
-            area.AddComponent<RectMask2D>();
-
-            var align = centered ? TextAlignmentOptions.Center : TextAlignmentOptions.Left;
-            var ph = MakeText("Placeholder", area.transform, placeholder, fontSize, Palette.TextDim, align, FontStyles.Italic);
-            Stretch(ph.rectTransform);
-            var txt = MakeText("Text", area.transform, string.Empty, fontSize, Palette.Text, align);
-            Stretch(txt.rectTransform);
-            txt.richText = false;
-            if (centered) txt.characterSpacing = 12;
-
-            input.textViewport = areaRt;
-            input.textComponent = txt;
-            input.placeholder = ph;
-            input.characterLimit = charLimit;
-            input.contentType = contentType;
-            input.lineType = TMP_InputField.LineType.SingleLine;
-            input.pointSize = fontSize;
-            input.customCaretColor = true;
-            input.caretColor = Palette.Accent;
-            var sel = Palette.Accent;
-            input.selectionColor = new Color(sel.r, sel.g, sel.b, 0.35f);
-
-            var colors = ColorBlock.defaultColorBlock;
-            colors.normalColor = Color.white;
-            colors.highlightedColor = Color.white;
-            colors.pressedColor = new Color(0.9f, 0.9f, 0.9f, 1f);
-            colors.selectedColor = Color.white;
-            colors.fadeDuration = 0.08f;
-            input.colors = colors;
-            return input;
-        }
-
-        /// <summary>Container for row instances. With a layout group (lobby) or manual positions (scoreboard/reveal).</summary>
-        private static RectTransform MakeRowsContainer(string name, Transform parent, float spacing, bool layoutGroup)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 1f);
-            if (layoutGroup)
-            {
-                var v = go.AddComponent<VerticalLayoutGroup>();
-                v.padding = new RectOffset(0, 0, 0, 0);
-                v.spacing = spacing;
-                v.childAlignment = TextAnchor.UpperCenter;
-                v.childControlWidth = true;
-                v.childControlHeight = true;
-                v.childForceExpandWidth = true;
-                v.childForceExpandHeight = false;
-            }
-            return rt;
+            img.rectTransform.Fill();
         }
 
         // ------------------------------------------------------------------
-        // Layout / reflection utilities
+        // Reflection utilities
         // ------------------------------------------------------------------
-
-        private static RectTransform PlaceTop(RectTransform rt, float y, Vector2 size)
-        {
-            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
-            rt.pivot = new Vector2(0.5f, 1f);
-            rt.sizeDelta = size;
-            rt.anchoredPosition = new Vector2(0f, -y);
-            return rt;
-        }
-
-        private static void Stretch(RectTransform rt, float l = 0, float t = 0, float r = 0, float b = 0)
-        {
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.offsetMin = new Vector2(l, b);
-            rt.offsetMax = new Vector2(-r, -t);
-        }
 
         private static void SetPrivate(Object target, string field, Object value)
         {

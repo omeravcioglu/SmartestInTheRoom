@@ -12,7 +12,11 @@ namespace Smartest.Minigames
     /// </summary>
     public class CountTheDotsGame : MinigameView
     {
+        private const float DotSize = 26f;
+
         private readonly List<RectTransform> _dots = new List<RectTransform>();
+        private readonly List<Vector2> _from = new List<Vector2>();
+        private readonly List<Vector2> _velocity = new List<Vector2>();
         private Image[] _answers;
         private TMP_Text _label;
         private int _count;
@@ -40,11 +44,22 @@ namespace Smartest.Minigames
 
             for (int i = 0; i < _count; i++)
             {
-                var pos = new Vector2(RandomRange(-fieldW * 0.45f, fieldW * 0.45f),
+                // Keep every dot clear of the others: two dots stacked on top of each other
+                // make the right answer unknowable, which is a coin flip, not a skill.
+                Vector2 pos = default;
+                for (int attempt = 0; attempt < 40; attempt++)
+                {
+                    pos = new Vector2(RandomRange(-fieldW * 0.45f, fieldW * 0.45f),
                                       50f + RandomRange(-fieldH * 0.4f, fieldH * 0.4f));
-                var rt = (RectTransform)UiKit.Dot(Area, "Dot" + i, 26f, pos, Palette.Accent).transform;
-                if (moving) rt.localRotation = Quaternion.identity;
+                    if (ClearOfOthers(pos)) break;
+                }
+                // From level four the dots drift while they're up, which is what makes a
+                // quick count harder than a glance at a still picture.
+                var velocity = moving ? new Vector2(RandomRange(-70f, 70f), RandomRange(-40f, 40f)) : Vector2.zero;
+                var rt = (RectTransform)UiKit.Dot(Area, "Dot" + i, DotSize, pos, Palette.Accent).transform;
                 _dots.Add(rt);
+                _from.Add(pos);
+                _velocity.Add(velocity);
             }
 
             // Answer tiles appear straight away but do nothing until the dots are gone.
@@ -66,8 +81,19 @@ namespace Smartest.Minigames
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(fieldH * 0.5f + 80f)));
         }
 
+        private bool ClearOfOthers(Vector2 pos)
+        {
+            for (int i = 0; i < _from.Count; i++)
+                if (Vector2.Distance(pos, _from[i]) < DotSize + 6f) return false;
+            return true;
+        }
+
         protected override void OnTick(float dt)
         {
+            if (!_hidden)
+                for (int i = 0; i < _dots.Count; i++)
+                    if (_velocity[i] != Vector2.zero) _dots[i].anchoredPosition = _from[i] + _velocity[i] * Elapsed;
+
             if (!_hidden && Elapsed >= _flashFor)
             {
                 _hidden = true;

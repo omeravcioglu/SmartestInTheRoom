@@ -47,6 +47,11 @@ namespace Smartest.Core
             if (Instance != null && Instance != this) { Destroy(this); return; }
             Instance = this;
 
+            // Nothing is heard without an AudioListener, and neither scene has one (their
+            // cameras are built without it). This object lives for the whole session, so one
+            // listener here covers the menu and the game — every voice line and sound effect.
+            if (FindAnyObjectByType<AudioListener>() == null) gameObject.AddComponent<AudioListener>();
+
             narratorSource = Ensure(narratorSource, "Narrator");
             musicSource = Ensure(musicSource, "Music");
             sfxSource = Ensure(sfxSource, "Sfx");

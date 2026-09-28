@@ -289,6 +289,16 @@ namespace Smartest.Core
                 { "count_dots",   "Count the Dots. You won't have time to count. Guess well." },
                 { "bullseye",     "Bullseye. Dead centre. Get close, get out." },
                 { "steady_hand",  "Steady Hand. Just... don't move. That's the whole thing." },
+                { "chase",        "Chase. The ball never stops, so neither do you." },
+                { "buzz_wire",    "Buzz Wire. Steady now. Touch the sides and it's over." },
+                { "hover",        "Hover. Hold to go up, let go to come down. Stay in the gold." },
+                { "lasers",       "Lasers. Find the gap. Every single time." },
+                { "pop",          "Pop. Click them before they're gone. All of them." },
+                { "shell_game",   "Shell Game. Eyes on the ball. I'm not saying I cheat. I'm not saying I don't." },
+                { "stack",        "Stack. Drop it straight. Whatever hangs off is gone." },
+                { "keepy_uppy",   "Keepy Uppy. Don't let it touch the floor. That's it. That's the game." },
+                { "flap",         "Flap. You know this one. You hate this one." },
+                { "flash_point",  "Flash Point. It's there, then it isn't. Remember where." },
             };
 
             var list = new List<Entry>();

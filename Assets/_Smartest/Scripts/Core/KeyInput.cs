@@ -126,5 +126,16 @@ namespace Smartest.Core
             return Input.GetMouseButtonDown(0);
 #endif
         }
+
+        /// <summary>The left button is down right now (not just pressed this frame).</summary>
+        public static bool MouseHeld()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var m = Mouse.current;
+            return m != null && m.leftButton.isPressed;
+#else
+            return Input.GetMouseButton(0);
+#endif
+        }
     }
 }

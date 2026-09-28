@@ -132,6 +132,40 @@ namespace Smartest.Tests
         }
 
         [Test]
+        public void APlayOffSettlesItselfWhenATiedPlayerLeaves()
+        {
+            var ladder = new EliminationLadder(new[] { A, B, C }, MetricOrder.LowerIsBetter);
+            ladder.Submit(Reports((A, false, 100), (B, false, 200), (C, false, 200)));
+            Assert.IsTrue(ladder.InTieBreak);
+
+            ladder.Remove(C); // left in the middle of the play-off
+            var step = ladder.Submit(Reports((B, false, 90)));
+
+            Assert.IsFalse(step.RepeatHarder, "one player can't be tied with themselves");
+            Assert.AreEqual(0, step.Eliminated.Count);
+            Assert.IsFalse(ladder.InTieBreak);
+            Assert.IsFalse(ladder.Finished);
+            CollectionAssert.AreEquivalent(new[] { A, B }, ladder.Participants);
+        }
+
+        [Test]
+        public void WhenEveryTiedPlayerLeavesTheWatchersAreNotBlamedForTheLevel()
+        {
+            var ladder = new EliminationLadder(new[] { A, B, C, D }, MetricOrder.LowerIsBetter);
+            ladder.Submit(Reports((A, false, 100), (B, false, 200), (C, false, 200), (D, false, 50)));
+            CollectionAssert.AreEquivalent(new[] { B, C }, ladder.Participants);
+
+            ladder.Remove(B);
+            ladder.Remove(C);
+            // A and D only watched the play-off, so nobody reports for it.
+            var step = ladder.Submit(Reports());
+
+            Assert.IsFalse(step.RepeatHarder, "watchers must not count as having failed a level they didn't play");
+            Assert.AreEqual(0, step.Eliminated.Count);
+            CollectionAssert.AreEquivalent(new[] { A, D }, ladder.Participants);
+        }
+
+        [Test]
         public void LeavingTheGameEndsItWhenOnlyOnePlayerIsLeft()
         {
             var ladder = new EliminationLadder(new[] { A, B }, MetricOrder.LowerIsBetter);
@@ -161,6 +195,111 @@ namespace Smartest.Tests
             Assert.IsTrue(ladder.Finished);
             Assert.AreEqual(7, levels);
             Assert.AreEqual(1, ladder.Alive.Count);
+        }
+
+        // ---- Warm-up levels: only failing knocks you out ----
+
+        private static EliminationLadder FourWithTwoWarmUps()
+            => new EliminationLadder(new[] { A, B, C, D }, MetricOrder.LowerIsBetter, 20, warmUpLevels: 2);
+
+        [Test]
+        public void OnAWarmUpLevelEveryoneWhoClearsItPlaysOn()
+        {
+            var ladder = FourWithTwoWarmUps();
+            for (int level = 1; level <= 2; level++)
+            {
+                var step = ladder.Submit(Reports((A, false, 100), (B, false, 200), (C, false, 150), (D, false, 400)));
+                Assert.IsTrue(step.AllThrough, $"level {level} is a warm-up");
+                Assert.AreEqual(0, step.Eliminated.Count, "the slowest mustn't go out on a warm-up");
+                Assert.IsFalse(step.RepeatHarder);
+                Assert.IsFalse(step.TieBreak);
+                CollectionAssert.AreEquivalent(new[] { A, B, C, D }, ladder.Alive);
+                Assert.AreEqual(level + 1, ladder.Level, "each warm-up is followed by a harder level");
+            }
+
+            // After the warm-ups the usual rule is back: nobody failed, so the worst goes.
+            var third = ladder.Submit(Reports((A, false, 100), (B, false, 200), (C, false, 150), (D, false, 400)));
+            Assert.IsFalse(third.AllThrough);
+            CollectionAssert.AreEqual(new[] { D }, third.Eliminated);
+        }
+
+        [Test]
+        public void FailingAWarmUpLevelStillPutsYouOut()
+        {
+            var ladder = FourWithTwoWarmUps();
+            var step = ladder.Submit(Reports((A, false, 100), (B, false, 200), (C, true, 0), (D, false, 300)));
+            Assert.IsFalse(step.AllThrough);
+            CollectionAssert.AreEqual(new[] { C }, step.Eliminated);
+            CollectionAssert.AreEquivalent(new[] { A, B, D }, ladder.Alive);
+        }
+
+        [Test]
+        public void EveryoneFailingAWarmUpLevelStillReplaysItHarder()
+        {
+            var ladder = FourWithTwoWarmUps();
+            var step = ladder.Submit(Reports((A, true, 0), (B, true, 0), (C, true, 0), (D, true, 0)));
+            Assert.IsTrue(step.RepeatHarder);
+            Assert.IsFalse(step.AllThrough);
+            Assert.AreEqual(4, ladder.Alive.Count);
+            Assert.AreEqual(2, ladder.Level);
+        }
+
+        [Test]
+        public void ADeadHeatOnAWarmUpLevelNeedsNoPlayOff()
+        {
+            var ladder = FourWithTwoWarmUps();
+            var step = ladder.Submit(Reports((A, false, 100), (B, false, 200), (C, false, 200), (D, false, 200)));
+            Assert.IsTrue(step.AllThrough);
+            Assert.IsFalse(step.TieBreak);
+            Assert.IsFalse(ladder.InTieBreak);
+            CollectionAssert.AreEquivalent(new[] { A, B, C, D }, ladder.Participants);
+        }
+
+        [Test]
+        public void TwoPlayersAreNotDecidedOnTheEasiestLevel()
+        {
+            var ladder = new EliminationLadder(new[] { A, B }, MetricOrder.LowerIsBetter, 20, warmUpLevels: 2);
+            ladder.Submit(Reports((A, false, 100), (B, false, 101)));
+            Assert.IsFalse(ladder.Finished, "a millisecond on level one mustn't settle a two-player minigame");
+            ladder.Submit(Reports((A, false, 100), (B, false, 101)));
+            Assert.IsFalse(ladder.Finished);
+
+            var third = ladder.Submit(Reports((A, false, 100), (B, false, 101)));
+            Assert.IsTrue(third.Finished);
+            CollectionAssert.AreEqual(new[] { A, B }, third.Ranking);
+        }
+
+        [Test]
+        public void WarmUpsAddOnlyTheirOwnLevelsToAGameNobodyFails()
+        {
+            // Eight players, nobody ever failing: two warm-ups, then one out per level.
+            var ids = new List<ulong>();
+            for (ulong i = 1; i <= 8; i++) ids.Add(i);
+            var ladder = new EliminationLadder(ids, MetricOrder.LowerIsBetter, 20, warmUpLevels: 2);
+
+            int levels = 0;
+            while (!ladder.Finished && levels < 50)
+            {
+                var reports = new List<LevelReport>();
+                int metric = 10;
+                foreach (var id in ladder.Participants) reports.Add(new LevelReport(id, false, metric += 10));
+                ladder.Submit(reports);
+                levels++;
+            }
+            Assert.IsTrue(ladder.Finished);
+            Assert.AreEqual(9, levels);
+            Assert.AreEqual(1, ladder.Alive.Count);
+        }
+
+        [Test]
+        public void TheLevelCapStillEndsAGameThatIsAllWarmUp()
+        {
+            var ladder = new EliminationLadder(new[] { A, B }, MetricOrder.LowerIsBetter, maxLevels: 2, warmUpLevels: 5);
+            ladder.Submit(Reports((A, false, 100), (B, false, 200)));
+            var last = ladder.Submit(Reports((A, false, 100), (B, false, 200)));
+            Assert.IsTrue(last.Finished);
+            Assert.AreEqual(1, last.Places[A], "on the cap, the better last result ranks first");
+            Assert.AreEqual(2, last.Places[B]);
         }
     }
 
@@ -196,6 +335,10 @@ namespace Smartest.Tests
         [Test]
         public void ADeadHeatForLastMeansBothTakeThePenalty()
             => CollectionAssert.AreEqual(new[] { 20, 10, -5, -5 }, Deltas(1, 2, 3, 3));
+
+        [Test]
+        public void EveryoneSharingOnePlaceIsNotEveryoneLast()
+            => CollectionAssert.AreEqual(new[] { 20, 20 }, Deltas(1, 1));
 
         [Test]
         public void ThePayoutCurveIsJustThreeNumbers()

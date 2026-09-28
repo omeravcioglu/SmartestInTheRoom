@@ -75,7 +75,8 @@ namespace Smartest.Minigames
 
             _label.text = Mathf.RoundToInt(d) + " px off";
             _label.color = Palette.Green;
-            Finish(false, Mathf.RoundToInt(d));
+            // Hundredths of a pixel: whole pixels tie constantly, and every tie is a play-off.
+            Finish(false, Mathf.RoundToInt(d * 100f));
         }
 
         private void Fail(string why)

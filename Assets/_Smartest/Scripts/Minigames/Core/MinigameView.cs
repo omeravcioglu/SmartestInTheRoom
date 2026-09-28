@@ -115,9 +115,9 @@ namespace Smartest.Minigames
         {
             get
             {
-                if (Area == null) return new Vector2(880f, 420f);
+                if (Area == null) return new Vector2(1200f, 520f);
                 var s = Area.rect.size;
-                if (s.x < 50f || s.y < 50f) return new Vector2(880f, 420f);
+                if (s.x < 50f || s.y < 50f) return new Vector2(1200f, 520f);
                 return s;
             }
         }
@@ -133,10 +133,12 @@ namespace Smartest.Minigames
         protected float RandomRange(float min, float max) => LevelRng.Range(Rng, min, max);
         protected int RandomRange(int minInclusive, int maxExclusive) => LevelRng.Range(Rng, minInclusive, maxExclusive);
 
-        private void Update()
+        private void Update() => Advance(Time.unscaledDeltaTime);
+
+        /// <summary>One tick of the level. Update drives it in play; tests drive it with a fixed step.</summary>
+        public void Advance(float dt)
         {
             if (!Running) return;
-            float dt = Time.unscaledDeltaTime;
             Elapsed += dt;
             OnTick(dt);
         }

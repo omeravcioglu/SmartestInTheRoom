@@ -7,6 +7,10 @@ namespace Smartest.Minigames
     /// <summary>
     /// The word fights the colour. Reading is automatic and that's the trap — this level
     /// punishes the fast reader and rewards whoever can switch the habit off.
+    ///
+    /// Red and BLACK ink, not red and green: about one man in twelve can't tell red from
+    /// green, which made this the one minigame some players could never win. Red against
+    /// the page's own black ink differs in brightness too, so it reads for everyone.
     /// </summary>
     public class StroopGame : MinigameView
     {
@@ -15,7 +19,7 @@ namespace Smartest.Minigames
         private TMP_Text _label;
 
         private string[] _words;
-        private int[] _inks;      // 1 = red, 2 = green
+        private int[] _inks;      // 1 = red, 2 = black
         private int _index;
         private float _perPrompt;
         private float _promptStart;
@@ -33,8 +37,11 @@ namespace Smartest.Minigames
                 case 3: count = 6; _perPrompt = 1.2f; mismatch = true; break;
                 case 4: count = 8; _perPrompt = 0.9f; mismatch = true; break;
                 default:
+                    // Naming the ink of a mismatched word takes most people 600-700 ms before
+                    // they even press a key; a 0.5 s limit meant everybody failed, forever.
+                    // Past level four it gets longer, not impossibly faster.
                     count = Mathf.Min(12, 10 + (Level - 5));
-                    _perPrompt = Mathf.Max(0.5f, 0.7f - (Level - 5) * 0.05f);
+                    _perPrompt = Mathf.Max(0.7f, 0.8f - (Level - 5) * 0.025f);
                     mismatch = true; neutral = true; break;
             }
 
@@ -44,12 +51,12 @@ namespace Smartest.Minigames
             {
                 int ink = RandomRange(0, 2) == 0 ? 1 : 2;
                 _inks[i] = ink;
-                if (!mismatch) _words[i] = ink == 1 ? "RED" : "GREEN";
+                if (!mismatch) _words[i] = ink == 1 ? "RED" : "BLACK";
                 else if (neutral && RandomRange(0, 5) == 0) _words[i] = "GOLD";
-                else _words[i] = RandomRange(0, 2) == 0 ? "RED" : "GREEN";
+                else _words[i] = RandomRange(0, 2) == 0 ? "RED" : "BLACK";
             }
 
-            UiKit.Label(Area, "Keys", "1 = RED INK      2 = GREEN INK", 26f, Palette.Accent,
+            UiKit.Label(Area, "Keys", "1 = RED INK      2 = BLACK INK", 26f, Palette.Accent,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, 140f));
             _word = UiKit.Label(Area, "Word", string.Empty, 96f, Palette.Text,
                 new Vector2(size.x - 60f, 140f), new Vector2(0f, 20f));
@@ -70,7 +77,7 @@ namespace Smartest.Minigames
         {
             if (_index >= _words.Length) return;
             _word.text = _words[_index];
-            _word.color = _inks[_index] == 1 ? Palette.Red : Palette.Green;
+            _word.color = _inks[_index] == 1 ? Palette.Red : Palette.Ink;
             _progress.text = $"{_index + 1} / {_words.Length}";
             _promptStart = Elapsed;
         }

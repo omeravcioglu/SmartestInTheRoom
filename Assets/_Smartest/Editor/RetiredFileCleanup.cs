@@ -24,6 +24,8 @@ namespace Smartest.EditorTools
             "Assets/_Smartest/Tests/EditMode/PuzzleGenTests.cs",
             "Assets/_Smartest/Resources/TrickQuestions.asset",
             "Assets/_Smartest/Data/RoundLibrary.asset",
+            // The Tabloid UI draws everything from Resources/Ink; the old rounded panel is unused.
+            "Assets/_Smartest/Sprites/RoundedPanel.png",
         };
 
         /// <summary>

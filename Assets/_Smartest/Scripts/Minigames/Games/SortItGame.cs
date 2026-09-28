@@ -70,6 +70,9 @@ namespace Smartest.Minigames
         private void OnTile(int index)
         {
             if (!CanAct) return;
+            // A second click on a tile that's already sorted (a double-click, say) is not a
+            // wrong answer — Memory Boxes and Mirror ignore it the same way.
+            for (int i = 0; i < _index; i++) if (_order[i] == index) return;
             if (index != _order[_index])
             {
                 _tiles[index].color = Palette.Red;

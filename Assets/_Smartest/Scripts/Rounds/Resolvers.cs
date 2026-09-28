@@ -9,6 +9,8 @@ namespace Smartest.Rounds
     /// Shared helpers. Conventions:
     ///  - RedGreen: 1 = red, 0 = green.  YesNo: 1 = yes, 0 = no.  Numbers: 0..10.
     ///  - No answer (-1) is the passive option (green / no / 0) and can never *win* a round.
+    ///    Where Green is the bold move (The Door) or picking a side is the whole point (Sus),
+    ///    a missing answer is simply left out instead.
     /// All math is integer and deterministic; nothing here touches UnityEngine.
     /// </summary>
     internal static class R
@@ -92,14 +94,18 @@ namespace Smartest.Rounds
         }
     }
 
-    /// <summary>C02 — Green: +3 always. Red: +8 if fewer than half pick red, else 0.</summary>
+    /// <summary>
+    /// C02 — Green: +3 always. Red: +8 if half the room or fewer pick red, else 0.
+    /// "Half or fewer" rather than "fewer than half": with two players a lone Red is exactly
+    /// half, and a strict minority would make Red a guaranteed zero.
+    /// </summary>
     public sealed class PickAPillResolver : IRoundResolver
     {
         public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
         {
             int n = ctx.PlayerCount, greenPts = def.Param(0, 3), redPts = def.Param(1, 8);
             int reds = R.CountA(ctx.Answers);
-            bool redWins = reds * 2 < n;
+            bool redWins = reds * 2 <= n;
             var d = new int[n];
             for (int i = 0; i < n; i++) d[i] = R.IsA(ctx.Answers[i]) ? (redWins ? redPts : 0) : greenPts;
             string key = reds == 0 ? "noRed" : (redWins ? "redWins" : "redFails");
@@ -107,61 +113,53 @@ namespace Smartest.Rounds
         }
     }
 
-    /// <summary>C03 — Exactly floor(N/2) reds (and at least one): reds +10, greens −10. Otherwise nothing.</summary>
+    /// <summary>
+    /// C03 — Red vanishes, Green survives. Exactly floor(N/2) reds: greens +10, reds 0.
+    /// Any other split: everyone −5.
+    ///
+    /// The old payoff (balanced: reds +10, greens −10; otherwise nothing) let Red win or
+    /// break even whatever the room did, so nobody had a reason to press Green. Now the
+    /// volunteers are the ones who vanish: somebody has to take the zero so the rest get
+    /// paid, and missing the count costs everyone.
+    /// </summary>
     public sealed class TheSnapResolver : IRoundResolver
     {
         public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
         {
-            int n = ctx.PlayerCount, redPts = def.Param(0, 10), greenPts = def.Param(1, -10);
+            int n = ctx.PlayerCount, greenPts = def.Param(0, 10), redPts = def.Param(1, 0), missPts = def.Param(2, -5);
             int reds = R.CountA(ctx.Answers);
             var d = new int[n];
             bool balanced = reds >= 1 && reds == n / 2;
-            if (!balanced) return R.Make(def, d, "unbalanced");
+            if (!balanced)
+            {
+                for (int i = 0; i < n; i++) d[i] = missPts;
+                return R.Make(def, d, "unbalanced", R.Line(def, "unbalanced", ("n", reds.ToString())));
+            }
             for (int i = 0; i < n; i++) d[i] = R.IsA(ctx.Answers[i]) ? redPts : greenPts;
             return R.Make(def, d, "balanced");
         }
     }
 
-    /// <summary>C04 — Green: +15 if the only green, −5 if 2+ greens. Red: 0.</summary>
+    /// <summary>
+    /// C04 — Green climbs: +15 if the only climber, −5 each if 2+. Red stays in the water: 0.
+    /// Only a pressed Green climbs; a player who never answered stays in the water, so being
+    /// away from the keyboard can't sink the one person who did climb.
+    /// </summary>
     public sealed class TheDoorResolver : IRoundResolver
     {
         public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
         {
             int n = ctx.PlayerCount, onePts = def.Param(0, 15), manyPts = def.Param(1, -5);
             var d = new int[n];
-            int greens = 0;
-            for (int i = 0; i < n; i++) if (R.Answered(ctx.Answers[i]) && R.IsB(ctx.Answers[i])) greens++;
-            // Non-answers count as green for payoff purposes (passive), but can't be "the one".
-            int greensIncl = 0;
-            for (int i = 0; i < n; i++) if (R.IsB(ctx.Answers[i])) greensIncl++;
-            if (greensIncl == 0) return R.Make(def, d, "none");
-            if (greensIncl == 1)
-            {
-                for (int i = 0; i < n; i++) if (R.IsB(ctx.Answers[i])) d[i] = R.Answered(ctx.Answers[i]) ? onePts : 0;
-                return R.Make(def, d, greens == 1 ? "one" : "none");
-            }
-            for (int i = 0; i < n; i++) if (R.IsB(ctx.Answers[i])) d[i] = manyPts;
-            return R.Make(def, d, "many");
+            int climbers = 0;
+            for (int i = 0; i < n; i++) if (Climbs(ctx.Answers[i])) climbers++;
+            if (climbers == 0) return R.Make(def, d, "none");
+            int pts = climbers == 1 ? onePts : manyPts;
+            for (int i = 0; i < n; i++) if (Climbs(ctx.Answers[i])) d[i] = pts;
+            return R.Make(def, d, climbers == 1 ? "one" : "many");
         }
-    }
 
-    /// <summary>C14 — Any red: every leader −15, every red −3 (a red leader takes both). No red: nothing.</summary>
-    public sealed class AttackTheLeaderResolver : IRoundResolver
-    {
-        public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
-        {
-            int n = ctx.PlayerCount, leaderPts = def.Param(0, -15), attackerPts = def.Param(1, -3);
-            var d = new int[n];
-            if (R.CountA(ctx.Answers) == 0) return R.Make(def, d, "none");
-            int top = int.MinValue;
-            for (int i = 0; i < n; i++) top = Math.Max(top, ctx.Scores[i]);
-            for (int i = 0; i < n; i++)
-            {
-                if (ctx.Scores[i] == top) d[i] += leaderPts;
-                if (R.IsA(ctx.Answers[i])) d[i] += attackerPts;
-            }
-            return R.Make(def, d, "attack");
-        }
+        private static bool Climbs(int answer) => answer == 0;
     }
 
     /// <summary>C17 — Greens +5 unless everyone is green (then nobody). A lone red: +10.</summary>
@@ -181,19 +179,59 @@ namespace Smartest.Rounds
         }
     }
 
-    /// <summary>C22 — Minority color +10. Tie: nothing.</summary>
+    /// <summary>
+    /// C22 — Minority color +10. Tie: nothing. Only pressed colours count: a player who
+    /// never answered didn't pick the smaller side, so they can't be paid for it. And if the
+    /// whole room picked one colour, nobody was outnumbered.
+    /// </summary>
     public sealed class SusResolver : IRoundResolver
     {
         public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
         {
             int n = ctx.PlayerCount, pts = def.Param(0, 10);
             var d = new int[n];
-            int reds = R.CountA(ctx.Answers), greens = n - reds;
-            if (reds == greens) return R.Make(def, d, "tie");
-            bool redMinority = reds < greens;
+            int reds = 0, greens = 0;
             for (int i = 0; i < n; i++)
-                if (R.IsA(ctx.Answers[i]) == redMinority) d[i] = pts;
-            return R.Make(def, d, "reveal", R.Line(def, "reveal", ("color", redMinority ? "Red" : "Green")));
+            {
+                if (ctx.Answers[i] == 1) reds++;
+                else if (ctx.Answers[i] == 0) greens++;
+            }
+            if (reds == 0 || greens == 0) return R.Make(def, d, "same");
+            if (reds == greens) return R.Make(def, d, "tie");
+            int minority = reds < greens ? 1 : 0;
+            for (int i = 0; i < n; i++)
+                if (ctx.Answers[i] == minority) d[i] = pts;
+            return R.Make(def, d, "reveal", R.Line(def, "reveal", ("color", minority == 1 ? "Red" : "Green")));
+        }
+    }
+
+    /// <summary>
+    /// C30 Gold Rush — Red digs: the diggers split 10. Green sells shovels: +6 for every digger.
+    /// Digging alone is the best seat in the house, but a second digger halves the gold and
+    /// doubles the shovel money, so the room has to settle who digs. A player who never
+    /// answered neither digs nor sells.
+    /// </summary>
+    public sealed class GoldRushResolver : IRoundResolver
+    {
+        public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
+        {
+            int n = ctx.PlayerCount, gold = def.Param(0, 10), perDigger = def.Param(1, 6);
+            var d = new int[n];
+            int diggers = 0, sellers = 0, digger = -1;
+            for (int i = 0; i < n; i++)
+            {
+                if (ctx.Answers[i] == 1) { diggers++; digger = i; }
+                else if (ctx.Answers[i] == 0) sellers++;
+            }
+            if (diggers == 0) return R.Make(def, d, "none");
+            for (int i = 0; i < n; i++)
+            {
+                if (ctx.Answers[i] == 1) d[i] = gold / diggers;
+                else if (ctx.Answers[i] == 0) d[i] = perDigger * diggers;
+            }
+            if (diggers == 1) return R.Make(def, d, "one", R.Line(def, "one", ("name", ctx.NameOf(digger))));
+            string key = sellers == 0 ? "all" : "rush";
+            return R.Make(def, d, key, R.Line(def, key, ("n", diggers.ToString())));
         }
     }
 
@@ -221,34 +259,6 @@ namespace Smartest.Rounds
         }
     }
 
-    /// <summary>C15 — Sub-round k: any Yes → the Yes players split 5k (floor), round ends. No Yes by k=5: all +20.</summary>
-    public sealed class TheLeverResolver : IRoundResolver
-    {
-        public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
-        {
-            int n = ctx.PlayerCount, potPer = def.Param(0, 5), never = def.Param(1, 20);
-            int k = Math.Max(1, ctx.SubRound);
-            int last = Math.Max(1, def.subRounds);
-            var d = new int[n];
-            int yes = R.CountA(ctx.Answers);
-            if (yes > 0)
-            {
-                int share = (potPer * k) / yes;
-                for (int i = 0; i < n; i++) if (R.IsA(ctx.Answers[i])) d[i] = share;
-                string names = R.Names(ctx, i => R.IsA(ctx.Answers[i]));
-                return R.Make(def, d, "pulled", R.Line(def, "pulled", ("k", k.ToString()), ("names", names), ("pts", (potPer * k).ToString())));
-            }
-            if (k < last)
-            {
-                var r = R.Make(def, d, "held", R.Line(def, "held") + $" Next pot: {potPer * (k + 1)}.");
-                r.ContinueSubRounds = true;
-                return r;
-            }
-            for (int i = 0; i < n; i++) d[i] = never;
-            return R.Make(def, d, "never");
-        }
-    }
-
     /// <summary>C16 — Yes: −5. No: 0. Nobody Yes: all −10.</summary>
     public sealed class TrolleyResolver : IRoundResolver
     {
@@ -260,7 +270,8 @@ namespace Smartest.Rounds
             if (yes == 0)
             {
                 for (int i = 0; i < n; i++) d[i] = nonePts;
-                string who = n < 5 ? n.ToString() : "five";
+                // Everyone lost ten, so say how many that was — "five" only when it really is.
+                string who = n == 5 ? "five" : n.ToString();
                 return R.Make(def, d, "none", R.Line(def, "none", ("n", who)));
             }
             for (int i = 0; i < n; i++) d[i] = R.IsA(ctx.Answers[i]) ? yesPts : 0;
@@ -268,24 +279,11 @@ namespace Smartest.Rounds
         }
     }
 
-    /// <summary>C18 — Majority +3, minority −3, tie all −1.</summary>
-    public sealed class IsThisADreamResolver : IRoundResolver
-    {
-        public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
-        {
-            int n = ctx.PlayerCount, maj = def.Param(0, 3), min = def.Param(1, -3), tie = def.Param(2, -1);
-            var d = new int[n];
-            int yes = R.CountA(ctx.Answers), no = n - yes;
-            if (yes == no) { for (int i = 0; i < n; i++) d[i] = tie; return R.Make(def, d, "tie"); }
-            bool yesWins = yes > no;
-            for (int i = 0; i < n; i++) d[i] = R.IsA(ctx.Answers[i]) == yesWins ? maj : min;
-            return R.Make(def, d, "reveal", R.Line(def, "reveal", ("x", yesWins ? "yes" : "no")));
-        }
-    }
-
     /// <summary>
     /// C19 — Donors pay 3, last place collects it (ties split, floor). If at least half the
     /// room donates, every donor also gets +5 — so generosity pays once enough people join in.
+    /// A donor who is tied for last gives to the others tied with them. That matters most at
+    /// 0-0-0, when everyone is last place: otherwise every donation vanished into nobody.
     /// </summary>
     public sealed class CharityResolver : IRoundResolver
     {
@@ -297,20 +295,25 @@ namespace Smartest.Rounds
             if (donors == 0) return R.Make(def, d, "none");
             int low = int.MaxValue;
             for (int i = 0; i < n; i++) low = Math.Min(low, ctx.Scores[i]);
-            int lastCount = 0, outsideDonors = 0;
+            var last = new List<int>();
+            int outsideDonors = 0;
             for (int i = 0; i < n; i++)
             {
-                if (ctx.Scores[i] == low) lastCount++;
+                if (ctx.Scores[i] == low) last.Add(i);
                 else if (R.IsA(ctx.Answers[i])) outsideDonors++;
             }
-            int pool = gift * outsideDonors;
-            int share = lastCount > 0 ? pool / lastCount : 0;
+            int share = gift * outsideDonors / last.Count;
+            foreach (int i in last) d[i] += share;
+            foreach (int i in last)
+            {
+                // Nobody gives to themselves: a lone last-place donor's 3 simply goes.
+                if (!R.IsA(ctx.Answers[i]) || last.Count < 2) continue;
+                int each = gift / (last.Count - 1);
+                foreach (int j in last) if (j != i) d[j] += each;
+            }
             bool enough = donors * 2 >= n;
             for (int i = 0; i < n; i++)
-            {
                 if (R.IsA(ctx.Answers[i])) d[i] += cost + (enough ? bonus : 0);
-                if (ctx.Scores[i] == low) d[i] += share;
-            }
             string key = enough ? "enough" : "few";
             return R.Make(def, d, key, R.Line(def, key, ("n", donors.ToString())));
         }
@@ -339,27 +342,6 @@ namespace Smartest.Rounds
     // ------------------------------------------------------------------
     // Numbers
     // ------------------------------------------------------------------
-
-    /// <summary>C05 — All answered numbers distinct: +5 each (to those who answered). Any duplicate: everyone 0.</summary>
-    public sealed class RuleOneResolver : IRoundResolver
-    {
-        public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
-        {
-            int n = ctx.PlayerCount, pts = def.Param(0, 5);
-            var d = new int[n];
-            var seen = new HashSet<int>();
-            int answered = 0;
-            for (int i = 0; i < n; i++)
-            {
-                if (!R.Answered(ctx.Answers[i])) continue;
-                answered++;
-                if (!seen.Add(ctx.Answers[i])) return R.Make(def, d, "dup");
-            }
-            if (answered == 0) return R.Make(def, d, "dup");
-            for (int i = 0; i < n; i++) if (R.Answered(ctx.Answers[i])) d[i] = pts;
-            return R.Make(def, d, "unique");
-        }
-    }
 
     /// <summary>C07 — Lowest number chosen by exactly one player: +15. No unique number: nobody.</summary>
     public sealed class LowestUniqueResolver : IRoundResolver
@@ -405,30 +387,48 @@ namespace Smartest.Rounds
         }
     }
 
-    /// <summary>C09 — Contribution = min(answer, max(score,0)). Pot ×2 split equally (floor). Delta = share − contribution.</summary>
+    /// <summary>
+    /// C09 — Contribution = your answer. Pot ×2 split equally (floor). Delta = share − contribution.
+    /// If the pot comes to less than 3 per player, everyone also loses 5.
+    ///
+    /// Without that floor, 0 was always the best answer — every point you put in comes back
+    /// to you as 2/N of a point — so there was nothing to decide. The floor keeps the pull to
+    /// free-ride on everybody else, but someone has to feed the pot, and how much depends on
+    /// what the room does. (Contributions used to be capped at your current score as well,
+    /// which the rule never said and which made the round do nothing at 0-0-0.)
+    /// </summary>
     public sealed class ThePotResolver : IRoundResolver
     {
         public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
         {
-            int n = ctx.PlayerCount, mult = def.Param(0, 2);
+            int n = ctx.PlayerCount, mult = def.Param(0, 2), perPlayer = def.Param(1, 3), starvedPts = def.Param(2, -5);
             var d = new int[n];
             var contrib = new int[n];
             int pot = 0;
             for (int i = 0; i < n; i++)
             {
-                contrib[i] = Math.Min(R.Eff(ctx.Answers[i]), Math.Max(ctx.Scores[i], 0));
+                contrib[i] = R.Eff(ctx.Answers[i]);
                 pot += contrib[i];
             }
+
             int share = n > 0 ? (pot * mult) / n : 0;
+            bool starved = pot < perPlayer * n;
+            bool even = true;
             int topGiver = 0, topGainer = 0;
             for (int i = 0; i < n; i++)
             {
-                d[i] = share - contrib[i];
+                d[i] = share - contrib[i] + (starved ? starvedPts : 0);
+                if (contrib[i] != contrib[0]) even = false;
                 if (contrib[i] > contrib[topGiver]) topGiver = i;
                 if (d[i] > d[topGainer]) topGainer = i;
             }
-            string key = topGiver == topGainer ? "same" : "reveal";
-            return R.Make(def, d, key, R.Line(def, key, ("topGiver", ctx.NameOf(topGiver)), ("topGainer", ctx.NameOf(topGainer))));
+            if (pot == 0) return R.Make(def, d, "none");
+            if (starved)
+                return R.Make(def, d, "starved",
+                    R.Line(def, "starved", ("pot", pot.ToString()), ("need", (perPlayer * n).ToString())));
+            // Everyone gave the same: there is no "gave the most" to name.
+            if (even) return R.Make(def, d, "same");
+            return R.Make(def, d, "reveal", R.Line(def, "reveal", ("topGiver", ctx.NameOf(topGiver)), ("topGainer", ctx.NameOf(topGainer))));
         }
     }
 
@@ -460,28 +460,6 @@ namespace Smartest.Rounds
             if (R.Sum(ctx.Answers) > per * n) return R.Make(def, d, "over");
             for (int i = 0; i < n; i++) d[i] = R.Eff(ctx.Answers[i]);
             return R.Make(def, d, "under");
-        }
-    }
-
-    /// <summary>
-    /// C12 — The average has to land on EXACTLY 7 for anyone to score. One honest rating,
-    /// or one person overcompensating, and the whole room gets nothing.
-    /// </summary>
-    public sealed class RateThisGameResolver : IRoundResolver
-    {
-        public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
-        {
-            int n = ctx.PlayerCount, target = def.Param(0, 7), pts = def.Param(1, 10);
-            var d = new int[n];
-            int sum = R.Sum(ctx.Answers);
-            bool exact = n > 0 && sum == target * n; // average == target, integer-exact
-            if (exact)
-            {
-                for (int i = 0; i < n; i++) d[i] = pts;
-                return R.Make(def, d, "exact");
-            }
-            string avg = n > 0 ? ((double)sum / n).ToString("0.#", CultureInfo.InvariantCulture) : "0";
-            return R.Make(def, d, "miss", R.Line(def, "miss", ("x", avg)));
         }
     }
 
@@ -534,43 +512,52 @@ namespace Smartest.Rounds
     }
 
     /// <summary>
-    /// C26 Pairs — +10 for a number exactly two players picked. Being alone pays nothing and
-    /// so does being in a crowd, so the room has to split into couples without talking.
+    /// C29 Undercut — score your number, doubled if someone picked exactly one above you. If
+    /// someone picked exactly one below you, you score nothing. Every deal the room can make
+    /// has a betrayal that pays (if everyone takes 10, a 9 scores 18), so there's no safe
+    /// number, only a read on the others. A player who never answered touches nobody.
     /// </summary>
-    public sealed class PairsResolver : IRoundResolver
+    public sealed class UndercutResolver : IRoundResolver
     {
         public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
         {
-            int n = ctx.PlayerCount, pts = def.Param(0, 10);
+            int n = ctx.PlayerCount, mult = def.Param(0, 2);
             var d = new int[n];
-            var counts = new Dictionary<int, int>();
+            // x - 1 and x + 1 are never x, so "someone else picked it" is just "it was picked".
+            var picked = new HashSet<int>();
+            for (int i = 0; i < n; i++) if (R.Answered(ctx.Answers[i])) picked.Add(ctx.Answers[i]);
+
+            var victims = new List<int>();
+            var hunters = new List<int>();
             for (int i = 0; i < n; i++)
             {
                 if (!R.Answered(ctx.Answers[i])) continue;
-                counts.TryGetValue(ctx.Answers[i], out int c);
-                counts[ctx.Answers[i]] = c + 1;
+                int x = ctx.Answers[i];
+                if (picked.Contains(x - 1)) { victims.Add(i); continue; }
+                if (picked.Contains(x + 1)) { d[i] = mult * x; hunters.Add(i); }
+                else d[i] = x;
             }
-            var paired = new List<int>();
-            for (int i = 0; i < n; i++)
-            {
-                if (!R.Answered(ctx.Answers[i])) continue;
-                if (counts[ctx.Answers[i]] == 2) { d[i] = pts; paired.Add(i); }
-            }
-            if (paired.Count == 0) return R.Make(def, d, "none", R.Line(def, "none"));
-            return R.Make(def, d, "pairs",
-                R.Line(def, "pairs", ("names", R.Join(paired.ConvertAll(ctx.NameOf))), ("n", paired.Count.ToString())));
+            // The bottom of any chain is never undercut itself, so a victim always has a hunter.
+            if (victims.Count == 0) return R.Make(def, d, "none");
+            return R.Make(def, d, "undercut", R.Line(def, "undercut",
+                ("victims", R.Join(victims.ConvertAll(ctx.NameOf))), ("hunters", R.Join(hunters.ConvertAll(ctx.NameOf)))));
         }
     }
 
     /// <summary>
-    /// C28 Bandwagon — the biggest group of matching numbers scores; a unanimous room scores
-    /// double. If nobody matched anybody, the round pays nothing at all.
+    /// C31 Mirror Match — your mirror is 11 minus your number (3 and 8). Score your number if
+    /// someone picked your mirror, unless someone else picked your number too. Every pair
+    /// splits eleven unevenly (10 + 1, 6 + 5), so the room has to settle who takes the small
+    /// end, and crowding a number wrecks it for everyone on it.
     /// </summary>
-    public sealed class BandwagonResolver : IRoundResolver
+    public sealed class MirrorMatchResolver : IRoundResolver
     {
+        // Odd on purpose: no number can be its own mirror.
+        private const int MirrorSum = 11;
+
         public RoundResult Resolve(RoundDefinition def, RoundContext ctx)
         {
-            int n = ctx.PlayerCount, pts = def.Param(0, 5), unanimousPts = def.Param(1, 10);
+            int n = ctx.PlayerCount;
             var d = new int[n];
             var counts = new Dictionary<int, int>();
             for (int i = 0; i < n; i++)
@@ -579,23 +566,16 @@ namespace Smartest.Rounds
                 counts.TryGetValue(ctx.Answers[i], out int c);
                 counts[ctx.Answers[i]] = c + 1;
             }
-            int best = 0, bestNumber = 0;
-            foreach (var kv in counts)
-                if (kv.Value > best || (kv.Value == best && kv.Key < bestNumber)) { best = kv.Value; bestNumber = kv.Key; }
-
-            if (best < 2) return R.Make(def, d, "none", R.Line(def, "none"));
-
-            bool unanimous = best == n;
-            int pay = unanimous ? unanimousPts : pts;
-            var riders = new List<int>();
+            var matched = new List<int>();
             for (int i = 0; i < n; i++)
             {
                 if (!R.Answered(ctx.Answers[i])) continue;
-                if (counts[ctx.Answers[i]] == best) { d[i] = pay; riders.Add(i); }
+                int x = ctx.Answers[i];
+                counts.TryGetValue(MirrorSum - x, out int mirrors);
+                if (mirrors > 0 && counts[x] == 1) { d[i] = x; matched.Add(i); }
             }
-            string key = unanimous ? "unanimous" : "crowd";
-            return R.Make(def, d, key,
-                R.Line(def, key, ("n", bestNumber.ToString()), ("names", R.Join(riders.ConvertAll(ctx.NameOf)))));
+            if (matched.Count == 0) return R.Make(def, d, "none");
+            return R.Make(def, d, "pairs", R.Line(def, "pairs", ("names", R.Join(matched.ConvertAll(ctx.NameOf)))));
         }
     }
 
@@ -611,26 +591,22 @@ namespace Smartest.Rounds
             { ResolverType.PickAPill, new PickAPillResolver() },
             { ResolverType.TheSnap, new TheSnapResolver() },
             { ResolverType.TheDoor, new TheDoorResolver() },
-            { ResolverType.RuleOne, new RuleOneResolver() },
             { ResolverType.LowestUnique, new LowestUniqueResolver() },
             { ResolverType.TwoThirds, new TwoThirdsResolver() },
             { ResolverType.ThePot, new ThePotResolver() },
             { ResolverType.SilentAuction, new SilentAuctionResolver() },
             { ResolverType.Greedy, new GreedyResolver() },
-            { ResolverType.RateThisGame, new RateThisGameResolver() },
             { ResolverType.TakeTheHit, new TakeTheHitResolver() },
-            { ResolverType.AttackTheLeader, new AttackTheLeaderResolver() },
-            { ResolverType.TheLever, new TheLeverResolver() },
             { ResolverType.Trolley, new TrolleyResolver() },
             { ResolverType.OneUp, new OneUpResolver() },
-            { ResolverType.IsThisADream, new IsThisADreamResolver() },
             { ResolverType.Charity, new CharityResolver() },
             { ResolverType.PredictTheRoom, new PredictTheRoomResolver() },
             { ResolverType.TheGodfather, new TheGodfatherResolver() },
             { ResolverType.Sus, new SusResolver() },
-            { ResolverType.Pairs, new PairsResolver() },
             { ResolverType.Sacrifice, new SacrificeResolver() },
-            { ResolverType.Bandwagon, new BandwagonResolver() },
+            { ResolverType.Undercut, new UndercutResolver() },
+            { ResolverType.GoldRush, new GoldRushResolver() },
+            { ResolverType.MirrorMatch, new MirrorMatchResolver() },
         };
 
         public static IRoundResolver Get(ResolverType type)

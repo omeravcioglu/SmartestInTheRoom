@@ -44,7 +44,7 @@ namespace Smartest.Minigames
             new MinigameEntry {
                 Id = "timing_bar", RoundId = 102, Title = "Timing Bar",
                 Prompt = "Stop it in the gold.",
-                Rule = "Press SPACE while the marker is inside the gold zone. Miss the zone and you're out.",
+                Rule = "Press SPACE while the marker is inside the gold zone — closer to the middle is better. Miss it and you're out.",
                 Controls = "SPACE", ViewType = typeof(TimingBarGame),
                 Order = MetricOrder.LowerIsBetter, LevelSeconds = 10f },
 
@@ -65,7 +65,7 @@ namespace Smartest.Minigames
             new MinigameEntry {
                 Id = "press_luck", RoundId = 105, Title = "Press Your Luck",
                 Prompt = "How long can you hold?",
-                Rule = "The bank climbs. Press SPACE to keep it. It busts at a hidden moment — bust and you get nothing.",
+                Rule = "The bank climbs. Press SPACE to keep it before it busts at a hidden moment. Bust, or bank the least, and you're out.",
                 Controls = "SPACE", ViewType = typeof(PressYourLuckGame),
                 Order = MetricOrder.HigherIsBetter, LevelSeconds = 14f },
 
@@ -73,7 +73,7 @@ namespace Smartest.Minigames
             new MinigameEntry {
                 Id = "stroop", RoundId = 106, Title = "Stroop",
                 Prompt = "Read the colour, not the word.",
-                Rule = "Press 1 for RED ink, 2 for GREEN ink — the colour it's printed in, not the word. One mistake and you're out.",
+                Rule = "Press 1 for RED ink, 2 for BLACK ink — the colour it's printed in, not the word. One mistake and you're out.",
                 Controls = "1 / 2", ViewType = typeof(StroopGame),
                 Order = MetricOrder.LowerIsBetter, LevelSeconds = 14f },
 
@@ -81,15 +81,15 @@ namespace Smartest.Minigames
                 Id = "which_first", RoundId = 107, Title = "Which Was First?",
                 Prompt = "They light almost together.",
                 Rule = "Press the number of the box that lit up FIRST. Wrong box and you're out.",
-                Controls = "1 / 2 / 3", ViewType = typeof(WhichWasFirstGame),
+                Controls = "NUMBER KEYS", ViewType = typeof(WhichWasFirstGame),
                 Order = MetricOrder.LowerIsBetter, LevelSeconds = 10f },
 
             new MinigameEntry {
                 Id = "quick_math", RoundId = 108, Title = "Quick Math",
                 Prompt = "Bigger side wins.",
-                Rule = "Press 1 if the LEFT sum is bigger, 2 if the RIGHT one is. One wrong answer and you're out.",
+                Rule = "Press 1 if the LEFT side is bigger, 2 if the RIGHT side is. One wrong answer and you're out.",
                 Controls = "1 / 2", ViewType = typeof(QuickMathGame),
-                Order = MetricOrder.LowerIsBetter, LevelSeconds = 16f },
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 20f },
 
             new MinigameEntry {
                 Id = "arrow_rush", RoundId = 109, Title = "Arrow Rush",
@@ -101,9 +101,9 @@ namespace Smartest.Minigames
             new MinigameEntry {
                 Id = "dodge", RoundId = 110, Title = "Dodge",
                 Prompt = "Same storm for everyone.",
-                Rule = "Move with WASD and don't get hit. Survive the whole level or you're out.",
+                Rule = "Move with WASD and don't get hit until time runs out. Get hit, or cut it closest, and you're out.",
                 Controls = "W A S D", ViewType = typeof(DodgeGame),
-                Order = MetricOrder.HigherIsBetter, LevelSeconds = 14f },
+                Order = MetricOrder.HigherIsBetter, LevelSeconds = 9f },
 
             new MinigameEntry {
                 Id = "type_it", RoundId = 111, Title = "Type It",
@@ -130,7 +130,7 @@ namespace Smartest.Minigames
             new MinigameEntry {
                 Id = "spot_change", RoundId = 114, Title = "Spot the Change",
                 Prompt = "One box moved.",
-                Rule = "The pattern blinks and one box changes. Click the one that changed. Wrong box and you're out.",
+                Rule = "The pattern blinks and one box jumps to a new spot. Click where it landed. Wrong box and you're out.",
                 Controls = "CLICK", ViewType = typeof(SpotTheChangeGame),
                 Order = MetricOrder.LowerIsBetter, LevelSeconds = 14f },
 
@@ -173,9 +173,80 @@ namespace Smartest.Minigames
             new MinigameEntry {
                 Id = "steady_hand", RoundId = 120, Title = "Steady Hand",
                 Prompt = "Don't leave the circle.",
-                Rule = "Keep your cursor inside the gold circle until time runs out. Leave it once and you're out.",
+                Rule = "Keep your cursor inside the gold circle until time runs out — if it jumps, follow it. Leave it and you're out.",
                 Controls = "MOUSE", ViewType = typeof(SteadyHandGame),
-                Order = MetricOrder.HigherIsBetter, LevelSeconds = 14f },
+                Order = MetricOrder.HigherIsBetter, LevelSeconds = 6f },
+
+            new MinigameEntry {
+                Id = "chase", RoundId = 121, Title = "Chase",
+                Prompt = "It never stops.",
+                Rule = "Keep your cursor on the ball while it moves. Slip off and you're out.",
+                Controls = "MOUSE", ViewType = typeof(ChaseGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 12f },
+
+            new MinigameEntry {
+                Id = "buzz_wire", RoundId = 123, Title = "Buzz Wire",
+                Prompt = "Don't touch the sides.",
+                Rule = "Go from START to the gold end without leaving the path. Touch the edge and you're out.",
+                Controls = "MOUSE", ViewType = typeof(BuzzWireGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 16f },
+
+            new MinigameEntry {
+                Id = "hover", RoundId = 129, Title = "Hover",
+                Prompt = "Hold it in the gold.",
+                Rule = "Hold the mouse button to rise, let go to sink. Keep the dot in the gold zone.",
+                Controls = "HOLD CLICK", ViewType = typeof(HoverGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 12f },
+
+            new MinigameEntry {
+                Id = "lasers", RoundId = 130, Title = "Lasers",
+                Prompt = "Find the gap.",
+                Rule = "Keep your cursor in the box and slip through the gap in every red beam.",
+                Controls = "MOUSE", ViewType = typeof(LasersGame),
+                Order = MetricOrder.HigherIsBetter, LevelSeconds = 16f },
+
+            // ---------------- Mouse: clicking things that move ----------------
+            new MinigameEntry {
+                Id = "pop", RoundId = 122, Title = "Pop",
+                Prompt = "Before they shrink away.",
+                Rule = "Click every dot before it vanishes. Let one get away and you're out.",
+                Controls = "CLICK", ViewType = typeof(PopGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 14f },
+
+            new MinigameEntry {
+                Id = "shell_game", RoundId = 124, Title = "Shell Game",
+                Prompt = "Keep your eye on the ball.",
+                Rule = "Watch the ball go under a cup. Follow that cup through the shuffle, then click it.",
+                Controls = "CLICK", ViewType = typeof(ShellGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 14f },
+
+            new MinigameEntry {
+                Id = "stack", RoundId = 125, Title = "Stack",
+                Prompt = "Build it straight.",
+                Rule = "Click to drop each sliding block onto the tower. Miss the tower and you're out.",
+                Controls = "CLICK", ViewType = typeof(StackGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 18f },
+
+            new MinigameEntry {
+                Id = "keepy_uppy", RoundId = 126, Title = "Keepy Uppy",
+                Prompt = "Don't let it drop.",
+                Rule = "Click the ball to bounce it up. If it touches the floor, you're out.",
+                Controls = "CLICK", ViewType = typeof(KeepyUppyGame),
+                Order = MetricOrder.HigherIsBetter, LevelSeconds = 12f },
+
+            new MinigameEntry {
+                Id = "flap", RoundId = 127, Title = "Flap",
+                Prompt = "Mind the gaps.",
+                Rule = "Click to flap and fly through the gaps. Touch anything and you're out.",
+                Controls = "CLICK", ViewType = typeof(FlapGame),
+                Order = MetricOrder.HigherIsBetter, LevelSeconds = 15f },
+
+            new MinigameEntry {
+                Id = "flash_point", RoundId = 128, Title = "Flash Point",
+                Prompt = "Blink and it's gone.",
+                Rule = "A dot flashes and disappears. Click exactly where it was.",
+                Controls = "CLICK", ViewType = typeof(FlashPointGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 10f },
         };
 
         public static MinigameEntry Get(string id)

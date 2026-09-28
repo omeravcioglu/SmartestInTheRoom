@@ -14,6 +14,11 @@ namespace Smartest.Rounds
     ///    in 2-4 seconds. It is shown under the question, never on a button.
     ///  - Every round must be multiplayer: what the others do has to change your result,
     ///    and no option may be best no matter what the room does.
+    ///  - No team rounds (the room agrees and everyone scores the same), no move that only
+    ///    hurts someone else, and no step where one answer is always best.
+    ///  - If a round only holds up from three players, say so with MinPlayers = 3: with two,
+    ///    Sus can never pay, Lowest Unique and Two Thirds are solved by picking 1, your own
+    ///    points in The Pot come straight back to you, and one donor is already "half" in Charity.
     /// </summary>
     public static class RoundCatalog
     {
@@ -36,13 +41,15 @@ namespace Smartest.Rounds
             public List<RevealLine> Lines = new List<RevealLine>();
             public int SubRounds = 1;
             public int FollowUpId = -1;
+            /// <summary>Fewest players the round makes sense with; smaller matches never draw it.</summary>
+            public int MinPlayers = 1;
 
             public Spec L(string key, string text) { Lines.Add(new RevealLine(key, text)); return this; }
 
             public void ApplyTo(RoundDefinition d)
             {
                 d.id = Id; d.title = Title; d.prompt = Prompt; d.subLine = SubLine;
-                d.kind = Kind; d.minigameId = MinigameId; d.ruleText = Rule;
+                d.kind = Kind; d.minigameId = MinigameId; d.minPlayers = MinPlayers; d.ruleText = Rule;
                 d.inputType = Input; d.buttonNameA = NameA; d.buttonNameB = NameB;
                 d.allowZero = AllowZero; d.answerSeconds = AnswerSeconds;
                 d.resolver = Resolver; d.resolverParams = (int[])Params.Clone();
@@ -108,17 +115,18 @@ namespace Smartest.Rounds
                 .L("allRed", "Minus ten. You built this."),
 
             new Spec { Id = 2, Title = "Pick a Pill", Prompt = "Red pill or green pill?", Input = InputType.RedGreen,
-                Rule = "Red pays +8, but only if fewer than half of you pick Red. Green pays +3, guaranteed.",
+                Rule = "Red pays +8, but only if HALF of you or fewer pick Red. Green pays +3, guaranteed.",
                 Resolver = ResolverType.PickAPill, Params = new[] { 3, 8 } }
                 .L("redWins", "The rabbit hole goes eight points deep.")
                 .L("redFails", "Truth is worth zero when everyone has it.")
                 .L("noRed", "Everyone stayed asleep. Three each. Comfortable."),
 
             new Spec { Id = 3, Title = "The Snap", Prompt = "Half of you must vanish.", Input = InputType.RedGreen,
-                Rule = "If EXACTLY half of you pick Red, Reds get +10 and Greens lose 10. Any other split: nothing happens.",
-                Resolver = ResolverType.TheSnap, Params = new[] { 10, -10 } }
-                .L("balanced", "Perfectly balanced.")
-                .L("unbalanced", "Unbalanced. Nothing happens."),
+                SubLine = "With {players} of you, that's exactly {half} Red.",
+                Rule = "If EXACTLY half of you pick Red, the Reds vanish (0) and the Greens get +10. Any other split: everyone loses 5.",
+                Resolver = ResolverType.TheSnap, Params = new[] { 10, 0, -5 } }
+                .L("balanced", "Perfectly balanced. The ones who vanished paid for it.")
+                .L("unbalanced", "{n} vanished. Wrong number. Everybody pays."),
 
             new Spec { Id = 4, Title = "The Door", Prompt = "There's room on the door. For one.", Input = InputType.RedGreen,
                 Rule = "Green climbs on the door: +15 if you're the only one, −5 each if anyone joins you. Red stays in the water.",
@@ -127,32 +135,31 @@ namespace Smartest.Rounds
                 .L("many", "Physics doesn't care. Everybody's wet.")
                 .L("none", "There was always room."),
 
-            new Spec { Id = 5, Title = "Rule One", Prompt = "Pick a number. Don't match anyone.", Input = InputType.Number1to10,
-                Rule = "If every player picks a different number, everyone gets +5. If any two match, nobody gets anything.",
-                Resolver = ResolverType.RuleOne, Params = new[] { 5 } }
-                .L("unique", "You talked. Rule one is a suggestion.")
-                .L("dup", "Someone lied, or nobody talked. Both fine."),
-
-            new Spec { Id = 7, Title = "Lowest Unique", Prompt = "Lowest number nobody else picked wins.", Input = InputType.Number1to10,
+            new Spec { Id = 7, Title = "Lowest Unique", Prompt = "Lowest number nobody else picked wins.", Input = InputType.Number1to10, MinPlayers = 3,
                 Rule = "The lowest number that EXACTLY ONE player picked wins +15. Match someone and yours is worthless.",
                 Resolver = ResolverType.LowestUnique, Params = new[] { 15 } }
                 .L("win", "{name} wins with {n}. The rest matched or got scared.")
                 .L("none", "Everybody matched. Nobody wins. Cowards."),
 
-            new Spec { Id = 8, Title = "Two Thirds", Prompt = "Guess two-thirds of the average guess.", Input = InputType.Number1to10,
+            new Spec { Id = 8, Title = "Two Thirds", Prompt = "Guess two-thirds of the average guess.", Input = InputType.Number1to10, MinPlayers = 3,
                 Rule = "Closest to two-thirds of the room's average wins +10. Ties split it.",
                 Resolver = ResolverType.TwoThirds, Params = new[] { 10 } }
                 .L("win", "Target {x}. {name} wins. Whoever picked ten dragged the average and lost."),
 
-            new Spec { Id = 9, Title = "The Pot", Prompt = "Put points in the pot. It doubles.", Input = InputType.Number1to10,
-                Rule = "Everything put in is doubled and split equally between ALL players — including the ones who gave nothing.",
+            new Spec { Id = 9, Title = "The Pot", Prompt = "Put points in the pot. It doubles.", Input = InputType.Number1to10, MinPlayers = 3,
+                Rule = "Everything put in is doubled and split between ALL players. If the pot comes to less than 3 per player, everyone also loses 5.",
                 AllowZero = true,
-                Resolver = ResolverType.ThePot, Params = new[] { 2 } }
+                Resolver = ResolverType.ThePot, Params = new[] { 2, 3, -5 } }
                 .L("reveal", "{topGiver} gave the most. {topGainer} gained the most. Not the same person.")
-                .L("same", "{topGiver} gave the most and gained the most. Suspicious."),
+                .L("same", "Everyone put in the same. Perfectly fair. Deeply boring.")
+                .L("starved", "{pot} in the pot, {need} needed. Everybody pays five.")
+                .L("none", "Nobody put anything in. Everybody pays for it."),
 
+            // 0 is a real answer here: the reveal line and the tests both expect a room that
+            // doesn't bid, but without a 0 button the only way to stay out was to not answer.
             new Spec { Id = 10, Title = "Silent Auction", Prompt = "Bid for twenty points.", Input = InputType.Number1to10,
-                Rule = "Highest bid wins +20, split on a tie. Everyone pays their own bid — winners and losers.",
+                Rule = "Highest bid wins +20, split on a tie. Everyone pays their own bid — winners and losers. Bid 0 to sit out.",
+                AllowZero = true,
                 Resolver = ResolverType.SilentAuction, Params = new[] { 20 } }
                 .L("reveal", "{name} paid {n} for twenty. Everyone else paid for nothing.")
                 .L("none", "Nobody bid. The lot goes home. Cheap."),
@@ -163,12 +170,6 @@ namespace Smartest.Rounds
                 .L("under", "Restraint. Suspicious.")
                 .L("over", "Whoever picked ten is anonymous. They're not. Names are on the left."),
 
-            new Spec { Id = 12, Title = "Rate This Game", Prompt = "Rate this game.", Input = InputType.Number1to10,
-                Rule = "If the average of all ratings is EXACTLY 7, everyone gets +10. Anything else: nothing.",
-                Resolver = ResolverType.RateThisGame, Params = new[] { 7, 10 } }
-                .L("exact", "Seven. Thank you for the coordinated lie.")
-                .L("miss", "Average {x}. Somebody was honest. It cost everyone."),
-
             new Spec { Id = 13, Title = "Take the Hit", Prompt = "Someone has to take the hit.", Input = InputType.YesNo,
                 NameA = "VOLUNTEER", NameB = "STAY QUIET",
                 Rule = "Exactly one volunteer: they get +10 and everyone else +5. Two or more: each volunteer loses 5. Nobody: everyone loses 5.",
@@ -177,27 +178,12 @@ namespace Smartest.Rounds
                 .L("none", "Democracy.")
                 .L("many", "Heroes cancel out."),
 
-            new Spec { Id = 14, Title = "Attack the Leader", Prompt = "Attack the leader?", Input = InputType.RedGreen,
-                Rule = "If anyone picks Red, the leader loses 15 — and every attacker pays 3. Green: nothing happens.",
-                Resolver = ResolverType.AttackTheLeader, Params = new[] { -15, -3 } }
-                .L("attack", "Revolutions are cheap when you split the bill.")
-                .L("none", "Respect or fear. The leader can't tell either."),
-
-            new Spec { Id = 15, Title = "The Lever", Prompt = "Pull the lever?", Input = InputType.YesNo,
-                NameA = "PULL", NameB = "WAIT",
-                Rule = "Pull and split the pot with everyone else pulling now. Wait and it grows +5. Nobody pulls in five rounds: everyone +20.",
-                AnswerSeconds = 20, SubRounds = 5,
-                Resolver = ResolverType.TheLever, Params = new[] { 5, 20 } }
-                .L("pulled", "Round {k}. {names} split {pts}.")
-                .L("held", "Nobody pulled. The lever gets heavier.")
-                .L("never", "Twenty each. I've never seen that."),
-
             new Spec { Id = 16, Title = "Trolley", Prompt = "Pull the trolley lever?", Input = InputType.YesNo,
                 NameA = "PULL", NameB = "DON'T",
                 Rule = "Pulling costs you 5. If NOBODY pulls, everyone loses 10.",
                 Resolver = ResolverType.Trolley, Params = new[] { -5, -10 } }
                 .L("someYes", "{names}. Brave. Deceased.")
-                .L("none", "Five died. Coincidentally, {n} of you lost ten."),
+                .L("none", "Five died. Coincidentally, all {n} of you lost ten."),
 
             new Spec { Id = 17, Title = "1-Up", Prompt = "Grab the extra life?", Input = InputType.RedGreen,
                 Rule = "Green reaches for it: +5, unless EVERYONE reaches, then nobody gets it. Red holds back: +10 if you're the only Red.",
@@ -206,13 +192,7 @@ namespace Smartest.Rounds
                 .L("someRed", "Several of you held back. Nobody got the bonus for it.")
                 .L("allGreen", "Always one short. That's the design."),
 
-            new Spec { Id = 18, Title = "Is This a Dream?", Prompt = "Is this a dream?", Input = InputType.YesNo,
-                Rule = "The bigger side gets +3, the smaller side loses 3. An exact split costs everyone 1.",
-                Resolver = ResolverType.IsThisADream, Params = new[] { 3, -3, -1 } }
-                .L("reveal", "Majority said {x}. So it is. Reality is a vote.")
-                .L("tie", "Split. Reality undecided. Everyone loses one."),
-
-            new Spec { Id = 19, Title = "Charity", Prompt = "Give three points to last place?", Input = InputType.YesNo,
+            new Spec { Id = 19, Title = "Charity", Prompt = "Give three points to last place?", Input = InputType.YesNo, MinPlayers = 3,
                 NameA = "DONATE", NameB = "KEEP",
                 Rule = "Donating costs 3 and goes to last place. If HALF of you or more donate, every donor also gets +5.",
                 Resolver = ResolverType.Charity, Params = new[] { -3, 3, 5 } }
@@ -234,19 +214,14 @@ namespace Smartest.Rounds
                 .L("unique", "{name} picked {n}. Nobody dared.")
                 .L("shared", "{names}. Minus ten. One of you lied. Family."),
 
-            new Spec { Id = 22, Title = "Sus", Prompt = "Pick the colour fewer people pick.", Input = InputType.RedGreen,
+            new Spec { Id = 22, Title = "Sus", Prompt = "Pick the colour fewer people pick.", Input = InputType.RedGreen, MinPlayers = 3,
                 Rule = "Whichever colour FEWER players pick gains +10 each. An even split pays nobody.",
                 Resolver = ResolverType.Sus, Params = new[] { 10 } }
                 .L("reveal", "{color} was outnumbered. Outnumbered wins.")
+                .L("same", "One colour for everybody. Nobody was outnumbered.")
                 .L("tie", "Even split. Nobody's sus. Everybody's sus."),
 
             // ---------------- Added in the redesign ----------------
-
-            new Spec { Id = 26, Title = "Pairs", Prompt = "Find your twin. Just one.", Input = InputType.Number1to10,
-                Rule = "You get +10 if EXACTLY one other player picked your number. Alone or in a crowd: nothing.",
-                Resolver = ResolverType.Pairs, Params = new[] { 10 } }
-                .L("pairs", "{names} found each other. Everyone else guessed alone.")
-                .L("none", "No pairs. Ten people, ten islands."),
 
             new Spec { Id = 27, Title = "Sacrifice", Prompt = "Give up five points?", Input = InputType.YesNo,
                 NameA = "GIVE", NameB = "KEEP",
@@ -256,12 +231,32 @@ namespace Smartest.Rounds
                 .L("notEnough", "{n} gave. Not enough. They paid for the lesson.")
                 .L("none", "Nobody gave. Nothing happened. Efficient."),
 
-            new Spec { Id = 28, Title = "Bandwagon", Prompt = "Pick the number everyone else picks.", Input = InputType.Number1to10,
-                Rule = "Everyone on the MOST popular number gets +5. If all of you pick the same one, +10 each. No matches: nothing.",
-                Resolver = ResolverType.Bandwagon, Params = new[] { 5, 10 } }
-                .L("unanimous", "All of you on {n}. Ten each. Slightly terrifying.")
-                .L("crowd", "{names} matched. Everyone else guessed alone.")
-                .L("none", "Everyone picked differently. No bandwagon to jump on."),
+            // ---------------- Added 27 Sep 2026 ----------------
+            // They replace Rule One, Rate This Game, Is This a Dream?, Pairs and Bandwagon (team
+            // rounds: the room agrees on Discord and everybody scores the same), Attack the
+            // Leader (attacking never helped your own score) and The Lever (its last pull always
+            // said pull). None of these three has an agreement the room can't be betrayed out of.
+
+            new Spec { Id = 29, Title = "Undercut", Prompt = "Pick high. Mind the number just below yours.", Input = InputType.Number1to10,
+                Rule = "Score your number, doubled if someone picked exactly one above you. If someone picked exactly one below you, you score nothing.",
+                Resolver = ResolverType.Undercut, Params = new[] { 2 } }
+                .L("undercut", "{victims} got undercut. {hunters} scored double.")
+                .L("none", "Nobody undercut anybody. Everyone keeps their number."),
+
+            new Spec { Id = 30, Title = "Gold Rush", Prompt = "Dig for gold, or sell the shovels?", Input = InputType.RedGreen,
+                Rule = "Red digs: the diggers split 10 points. Green sells shovels: +6 for every digger.",
+                Resolver = ResolverType.GoldRush, Params = new[] { 10, 6 } }
+                .L("one", "{name} dug alone and struck gold. The shovel shop did fine too.")
+                .L("rush", "{n} diggers, one hill of gold. The shovel sellers did better.")
+                .L("all", "Everybody dug. Nobody sold a shovel. Ten points, split {n} ways.")
+                .L("none", "Nobody dug. Nobody needed a shovel. Zero all round."),
+
+            new Spec { Id = 31, Title = "Mirror Match", Prompt = "Find someone to pick your mirror.", Input = InputType.Number1to10,
+                SubLine = "Mirrors: 1↔10 · 2↔9 · 3↔8 · 4↔7 · 5↔6",
+                Rule = "Your mirror is 11 minus your number. Score your number if someone picked your mirror — unless someone else picked yours too.",
+                Resolver = ResolverType.MirrorMatch }
+                .L("pairs", "{names} found their mirror.")
+                .L("none", "No mirrors anywhere. Everybody looked alone."),
         };
     }
 }

@@ -28,11 +28,19 @@ namespace Smartest.Rounds
             return ids;
         }
 
-        /// <summary>Social rounds only — the deck the "question" half of the match draws from.</summary>
-        public List<int> SocialIds()
+        /// <summary>
+        /// Social rounds only — the deck the "question" half of the match draws from. Pass the
+        /// match's player count to leave out rounds that don't work with that few players (Sus
+        /// can never pay out between two). Nobody can join a match once it starts, so the count
+        /// at the start is the most it will ever be.
+        /// </summary>
+        public List<int> SocialIds(int players = 0)
         {
             var ids = new List<int>();
-            foreach (var r in rounds) if (r != null && r.kind == RoundKind.Social) ids.Add(r.id);
+            foreach (var r in rounds)
+                if (r != null && r.kind == RoundKind.Social && r.WorksWith(players)) ids.Add(r.id);
+            // Never an empty deck: if nothing fits (a solo test, say), deal everything.
+            if (ids.Count == 0 && players > 0) return SocialIds();
             return ids;
         }
 

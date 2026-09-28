@@ -16,6 +16,7 @@ namespace Smartest.Minigames
         private TMP_Text _label;
         private readonly List<float> _decoys = new List<float>();
         private float _greenAt;
+        private float _greenShownAt;
         private float _window;
         private float _decoyUntil;
         private int _decoyIndex;
@@ -46,6 +47,7 @@ namespace Smartest.Minigames
 
         protected override void OnTick(float dt)
         {
+            bool turnedGreenNow = false;
             if (!_green)
             {
                 while (_decoyIndex < _decoys.Count && Elapsed >= _decoys[_decoyIndex])
@@ -57,12 +59,16 @@ namespace Smartest.Minigames
                 if (Elapsed >= _greenAt)
                 {
                     _green = true;
+                    turnedGreenNow = true;
+                    // The clock starts on the frame green is drawn, not the scheduled instant
+                    // before it: otherwise a slower machine adds a frame to its players' times.
+                    _greenShownAt = Elapsed;
                     _box.color = Palette.Green;
                     _label.text = "NOW";
                     _label.color = Palette.Green;
                 }
             }
-            else if (Elapsed - _greenAt > _window)
+            else if (Elapsed - _greenShownAt > _window)
             {
                 Fail("TOO SLOW");
                 return;
@@ -71,12 +77,14 @@ namespace Smartest.Minigames
             if (!CanAct) return;
             if (!KeyInput.SpacePressed()) return;
 
-            if (!_green) Fail("TOO EARLY");
+            // A press seen on the very frame green appears was made before anyone could see
+            // it — a guess, not a reaction.
+            if (!_green || turnedGreenNow) Fail("TOO EARLY");
             else
             {
                 _label.text = "GOOD";
                 _label.color = Palette.Accent;
-                Finish(false, Ms(Elapsed - _greenAt));
+                Finish(false, Ms(Elapsed - _greenShownAt));
             }
         }
 

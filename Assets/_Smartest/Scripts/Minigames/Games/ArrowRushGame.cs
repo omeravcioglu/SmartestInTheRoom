@@ -11,7 +11,9 @@ namespace Smartest.Minigames
     /// </summary>
     public class ArrowRushGame : MinigameView
     {
-        private static readonly string[] Glyphs = { string.Empty, "▲", "▶", "▼", "◀" };
+        // ► and ◄ rather than ▶ and ◀: LiberationSans has no glyph for the latter two, so
+        // RIGHT and LEFT both rendered as the same empty box.
+        private static readonly string[] Glyphs = { string.Empty, "▲", "►", "▼", "◄" };
 
         private int[] _dirs;      // 1 up, 2 right, 3 down, 4 left
         private bool[] _gold;

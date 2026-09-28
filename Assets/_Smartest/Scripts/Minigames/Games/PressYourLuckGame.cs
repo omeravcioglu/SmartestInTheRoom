@@ -65,7 +65,9 @@ namespace Smartest.Minigames
 
             if (_label != null) { _label.text = "Banked " + _bank; _label.color = Palette.Green; }
             if (_bankText != null) _bankText.color = Palette.Green;
-            Finish(false, _bank);
+            // Ranked on the exact hold, not the displayed bank: the bank moves in tenths of a
+            // second, so two players banking "the same" would tie and have to play it off.
+            Finish(false, Ms(Elapsed));
         }
     }
 }

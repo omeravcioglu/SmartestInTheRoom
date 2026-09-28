@@ -45,6 +45,9 @@ namespace Smartest.Core
         public int maxPlayers = 8;
         [Tooltip("Alternate social rounds and minigames. Off = one shuffled pool of everything.")]
         public bool alternateSocialAndMinigame = true;
+        [Tooltip("With alternation on: how many minigames come between two questions. " +
+                 "1 = strictly one of each. Questions are the reading-heavy part, so fewer keeps the pace up.")]
+        [Range(1, 4)] public int minigamesPerQuestion = 2;
 
         [Header("Minigames")]
         [Tooltip("Rule card before the first level.")]
@@ -57,6 +60,9 @@ namespace Smartest.Core
         public float levelReportGraceSeconds = 0.4f;
         [Tooltip("Safety valve: a minigame can never run more levels than this.")]
         public int minigameMaxLevels = 20;
+        [Tooltip("Warm-up levels: on these, only failing knocks you out. From the next level on, " +
+                 "if nobody fails, the worst result goes out too. 0 = cut from level one.")]
+        public int minigameWarmUpLevels = 2;
 
         [Header("Minigame payout")]
         [Tooltip("Points for 1st, 2nd, 3rd... Last place always gets the penalty below instead.")]

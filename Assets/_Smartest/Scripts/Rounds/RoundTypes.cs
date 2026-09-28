@@ -27,28 +27,28 @@ namespace Smartest.Rounds
         PickAPill = 2,
         TheSnap = 3,
         TheDoor = 4,
-        RuleOne = 5,
         LowestUnique = 7,
         TwoThirds = 8,
         ThePot = 9,
         SilentAuction = 10,
         Greedy = 11,
-        RateThisGame = 12,
         TakeTheHit = 13,
-        AttackTheLeader = 14,
-        TheLever = 15,
         Trolley = 16,
         OneUp = 17,
-        IsThisADream = 18,
         Charity = 19,
         PredictTheRoom = 20,
         TheGodfather = 21,
         Sus = 22,
 
-        // --- Added in the multiplayer-first redesign (ids freed by the removed mind games) ---
-        Pairs = 26,      // +10 only if EXACTLY one other player picked your number
+        // --- Added in the multiplayer-first redesign ---
         Sacrifice = 27,  // enough givers and everybody profits
-        Bandwagon = 28   // the most popular number pays
+
+        // --- Added 27 Sep 2026, replacing the team rounds (Rule One 5, Rate This Game 12,
+        //     Is This a Dream 18, Pairs 26, Bandwagon 28), Attack the Leader 14 and The Lever 15.
+        //     Those ids stay retired so an old asset can never be read as a new round. ---
+        Undercut = 29,     // one below you steals your number, and doubles theirs
+        GoldRush = 30,     // dig and split the gold, or sell shovels to whoever digs
+        MirrorMatch = 31   // you only score if someone picks your mirror number
     }
 
     [Serializable]

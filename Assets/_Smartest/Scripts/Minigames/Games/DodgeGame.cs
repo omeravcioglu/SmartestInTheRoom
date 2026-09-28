@@ -90,6 +90,8 @@ namespace Smartest.Minigames
 
             _pos = Vector2.zero;
             _player = (RectTransform)UiKit.Dot(Area, "You", PlayerRadius * 2f, Vector2.zero, Palette.Accent).transform;
+            // Someone already knocked out watches the storm; they have no dot in it.
+            if (!Interactive) _player.gameObject.SetActive(false);
             _label = UiKit.Label(Area, "Hint", "WASD", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -_half.y - 30f));
         }
@@ -115,6 +117,7 @@ namespace Smartest.Minigames
                 if (!view.gameObject.activeSelf) view.gameObject.SetActive(true);
                 Vector2 p = Vector2.LerpUnclamped(b.From, b.To, t);
                 view.anchoredPosition = p;
+                if (!Interactive) continue;
 
                 // Box against circle, kept cheap: the gap between the dot and the square.
                 float dx = Mathf.Max(0f, Mathf.Abs(p.x - _pos.x) - b.Size * 0.5f);
@@ -132,7 +135,7 @@ namespace Smartest.Minigames
 
             if (Elapsed >= _survive)
             {
-                if (_label != null) { _label.text = "SURVIVED"; _label.color = Palette.Green; }
+                if (_label != null && Interactive) { _label.text = "SURVIVED"; _label.color = Palette.Green; }
                 int margin = _closest == float.MaxValue ? 999 : Mathf.RoundToInt(Mathf.Max(0f, _closest));
                 Finish(false, margin);
             }

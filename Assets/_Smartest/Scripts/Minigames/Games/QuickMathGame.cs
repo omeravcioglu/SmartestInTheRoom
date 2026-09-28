@@ -35,6 +35,9 @@ namespace Smartest.Minigames
                 case 4: count = 5; mode = 3; _perPrompt = 4f; break;
                 default: count = 5; mode = 4; _perPrompt = Mathf.Max(2f, 3f - (Level - 5) * 0.2f); break;
             }
+            // Every prompt's allowance has to fit inside the level's own deadline, or a player
+            // who never ran out of time on any prompt would still be timed out by the stage.
+            _perPrompt = Mathf.Min(_perPrompt, (LevelSeconds - 0.5f) / count);
 
             _leftText = new string[count];
             _rightText = new string[count];
@@ -132,7 +135,7 @@ namespace Smartest.Minigames
             _index++;
             if (_index >= _answer.Length)
             {
-                _left.text = "✓"; _right.text = "✓";
+                _left.text = "√"; _right.text = "√"; // LiberationSans has no ✓
                 _left.color = Palette.Green; _right.color = Palette.Green;
                 Finish(false, Ms(Elapsed));
             }

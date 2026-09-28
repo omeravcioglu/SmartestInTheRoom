@@ -31,13 +31,23 @@ namespace Smartest.Net
             new NetworkVariable<FixedString32Bytes>(new FixedString32Bytes(string.Empty));
         public NetworkVariable<int> Score = new NetworkVariable<int>(0);
         public NetworkVariable<bool> LockedIn = new NetworkVariable<bool>(false);
-        public NetworkVariable<int> CurrentAnswer = new NetworkVariable<int>(-1);
+        /// <summary>
+        /// Only the host and this player ever receive it. Everyone else learns the answer from
+        /// GameState.Results at the reveal — sent to all, it put every locked-in answer on every
+        /// machine while the others were still choosing.
+        /// </summary>
+        public NetworkVariable<int> CurrentAnswer = new NetworkVariable<int>(-1, NetworkVariableReadPermission.Owner);
         /// <summary>Minigames: 0 = knocked out, 1 = playing this level, 2 = still in but sitting a tie-break out.</summary>
         public NetworkVariable<byte> PlayState = new NetworkVariable<byte>(PlayStateOut);
 
         public const byte PlayStateOut = 0;
         public const byte PlayStatePlaying = 1;
         public const byte PlayStateWatching = 2;
+
+        /// <summary>Minigames: has reported this level (finished or failed) while others still play.</summary>
+        public NetworkVariable<bool> LevelDone = new NetworkVariable<bool>(false);
+        /// <summary>Minigames: the level this player went out on, 0 while still in (or on a social round).</summary>
+        public NetworkVariable<int> OutAtLevel = new NetworkVariable<int>(0);
 
         public bool IsPlayingLevel => PlayState.Value == PlayStatePlaying;
         public bool IsStillIn => PlayState.Value != PlayStateOut;
@@ -85,6 +95,9 @@ namespace Smartest.Net
             PlayerName.OnValueChanged += OnNameChanged;
             Score.OnValueChanged += OnScoreChanged;
             LockedIn.OnValueChanged += OnLockChanged;
+            PlayState.OnValueChanged += OnPlayStateChanged;
+            LevelDone.OnValueChanged += OnLevelDoneChanged;
+            OutAtLevel.OnValueChanged += OnOutAtLevelChanged;
 
             if (IsOwner)
             {
@@ -100,6 +113,9 @@ namespace Smartest.Net
             PlayerName.OnValueChanged -= OnNameChanged;
             Score.OnValueChanged -= OnScoreChanged;
             LockedIn.OnValueChanged -= OnLockChanged;
+            PlayState.OnValueChanged -= OnPlayStateChanged;
+            LevelDone.OnValueChanged -= OnLevelDoneChanged;
+            OutAtLevel.OnValueChanged -= OnOutAtLevelChanged;
             s_all.Remove(this);
             RosterChanged?.Invoke();
             base.OnNetworkDespawn();
@@ -114,6 +130,9 @@ namespace Smartest.Net
         private void OnNameChanged(FixedString32Bytes previous, FixedString32Bytes current) => RosterChanged?.Invoke();
         private void OnScoreChanged(int previous, int current) => RosterChanged?.Invoke();
         private void OnLockChanged(bool previous, bool current) => RosterChanged?.Invoke();
+        private void OnPlayStateChanged(byte previous, byte current) => RosterChanged?.Invoke();
+        private void OnLevelDoneChanged(bool previous, bool current) => RosterChanged?.Invoke();
+        private void OnOutAtLevelChanged(int previous, int current) => RosterChanged?.Invoke();
 
         // ---- RPCs (client -> server) ----
 
@@ -150,6 +169,8 @@ namespace Smartest.Net
             LockedIn.Value = false;
             CurrentAnswer.Value = -1;
             PlayState.Value = PlayStateOut;
+            LevelDone.Value = false;
+            OutAtLevel.Value = 0;
         }
 
         /// <summary>

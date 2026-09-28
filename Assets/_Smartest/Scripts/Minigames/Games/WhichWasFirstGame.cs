@@ -17,6 +17,7 @@ namespace Smartest.Minigames
         private int _first;
         private int _count;
         private float _startDelay;
+        private float _shownAt;
         private bool _allLit;
 
         protected override void Build()
@@ -29,7 +30,9 @@ namespace Smartest.Minigames
                 case 2: _count = 3; gap = 0.20f; break;
                 case 3: _count = 3; gap = 0.12f; break;
                 case 4: _count = 3; gap = 0.08f; break;
-                default: _count = 4; gap = Mathf.Max(0.03f, 0.05f - (Level - 5) * 0.005f); break;
+                // Floor of 40 ms: much below that, two boxes land on the same frame on an
+                // ordinary monitor and nobody could see which came first.
+                default: _count = 4; gap = Mathf.Max(0.04f, 0.05f - (Level - 5) * 0.005f); break;
             }
 
             float boxW = Mathf.Min(180f, (size.x - 80f - (_count - 1) * 24f) / _count);
@@ -68,19 +71,26 @@ namespace Smartest.Minigames
         {
             for (int i = 0; i < _count; i++)
                 if (Elapsed >= _times[i]) _boxes[i].color = Palette.Accent;
-            if (!_allLit && Elapsed >= _startDelay) _allLit = true;
+            bool litNow = false;
+            if (!_allLit && Elapsed >= _startDelay)
+            {
+                _allLit = true;
+                litNow = true;
+                _shownAt = Elapsed; // time from the frame it was drawn, as in Green Light
+            }
 
-            if (_allLit && Elapsed - _startDelay > 4f) { Fail("TOO SLOW"); return; }
+            if (_allLit && Elapsed - _shownAt > 4f) { Fail("TOO SLOW"); return; }
             if (!CanAct) return;
 
             int key = KeyInput.DigitPressed();
             if (key <= 0 || key > _count) return;
-            if (!_allLit) { Fail("TOO EARLY"); return; }
+            // A press registered on the frame the first box appears was made before it was seen.
+            if (!_allLit || litNow) { Fail("TOO EARLY"); return; }
 
             if (key - 1 == _first)
             {
                 _boxes[_first].color = Palette.Green;
-                Finish(false, Ms(Elapsed - _startDelay));
+                Finish(false, Ms(Elapsed - _shownAt));
             }
             else Fail("WRONG BOX");
         }

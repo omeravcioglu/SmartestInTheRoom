@@ -52,6 +52,12 @@ namespace Smartest.Core
             }
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            // A networked game can't pause when its window loses focus: an alt-tabbed host
+            // (to Discord, say) would freeze the match for everyone, and the unfocused
+            // window of a two-instances-on-one-PC test would stall. The project setting
+            // is off, so force it here where it can't be lost.
+            Application.runInBackground = true;
         }
     }
 }

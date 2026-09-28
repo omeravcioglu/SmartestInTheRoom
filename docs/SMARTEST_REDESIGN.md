@@ -169,7 +169,7 @@ All 20 are simultaneous, 5–20 s per level, one input each, and each is a diffe
 
 | # | Game | Rule shown on screen | Difficulty ramp | Out when | Rank by |
 |---|---|---|---|---|---|
-| 6 | **Stroop** | Press **1** for RED, **2** for GREEN — the INK colour, not the word. 5 in a row. | L1 5 prompts, word matches ink · L2 half mismatch · L3 6 prompts, 1.2 s each · L4 8 prompts, 0.9 s · L5 10 prompts, 0.7 s, "GOLD" as a neutral word | one wrong or one too slow | total time |
+| 6 | **Stroop** | Press **1** for RED, **2** for BLACK — the INK colour, not the word. 5 in a row. (Was GREEN; red/green is unreadable for colour-blind players.) | L1 5 prompts, word matches ink · L2 half mismatch · L3 6 prompts, 1.2 s each · L4 8 prompts, 0.9 s · L5 10 prompts, 0.7 s, "GOLD" as a neutral word | one wrong or one too slow | total time |
 | 7 | **Which Was First?** | Three boxes light up almost together. Press the number of the one that lit FIRST. | Gap between boxes: L1 300 ms · L2 200 · L3 120 · L4 80 · L5 50 ms with 4 boxes (keys 1–4) | wrong, or no answer in 4 s | reaction time |
 | 8 | **Quick Math** | Two sums. Press **1** if the LEFT is bigger, **2** if the RIGHT. 3 in a row. | L1 3 rounds, single-digit + · L2 4 rounds, + and − · L3 4 rounds, × · L4 5 rounds, two-digit, 4 s each · L5 5 rounds, mixed, 3 s each | one wrong or too slow | total time |
 | 9 | **Arrow Rush** | Press the arrows in order with WASD, fast. A GOLD arrow means press the OPPOSITE direction. | L1 4 arrows · L2 6 · L3 6 with 1 gold · L4 8 with 2 gold · L5 10 with 4 gold | wrong key, or 10 s | total time |

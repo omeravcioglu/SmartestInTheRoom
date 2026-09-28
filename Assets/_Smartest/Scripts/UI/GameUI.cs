@@ -3,30 +3,38 @@ using Smartest.Core;
 using Smartest.Minigames;
 using Smartest.Net;
 using Smartest.Rounds;
-using TMPro;
 using UnityEngine;
 
 namespace Smartest.UI
 {
     /// <summary>
     /// Drives the Game scene from GameState's networked phase. Every transition is a
-    /// reaction to a change callback; the only per-frame work is the countdown bar.
+    /// reaction to a change callback; the only per-frame work is the timers. The masthead
+    /// and the seat rail stay up the whole match; the stage in the middle swaps between the
+    /// round, the minigame and the reveal; the winner gets the whole page.
     /// Also fires all in-game voice lines (local only).
     /// </summary>
     public class GameUI : MonoBehaviour
     {
-        [SerializeField] private Panel scoreboardPanel;
-        [SerializeField] private ScoreboardUI scoreboard;
+        [Header("Always on screen")]
+        [SerializeField] private CanvasGroup hud;
+        [SerializeField] private Masthead masthead;
+        [SerializeField] private SeatRail seatRail;
+        [SerializeField] private HostCaption hostCaption;
+
+        [Header("The stage")]
         [SerializeField] private RoundPanel roundPanel;
         [SerializeField] private MinigameStage minigameStage;
         [SerializeField] private RevealPanel revealPanel;
         [SerializeField] private WinnerPanel winnerPanel;
-        [SerializeField] private TMP_Text roundCounter;
 
         private GameState _gs;
         private bool _bound;
         private bool _timerTenFired;
+        private bool _lockedLineFired;
         private bool _wasPlayingLevel;
+        private int _minigameStartCount;
+        private bool _lastTwoAnnounced;
         private GamePhase _shownPhase = GamePhase.Idle;
 
         // For the "wait, they were last!" line: where everyone stood before this round scored.
@@ -36,13 +44,14 @@ namespace Smartest.UI
 
         private void Start()
         {
-            if (scoreboardPanel != null) scoreboardPanel.ShowInstant();
+            SetHud(true);
             if (roundPanel != null) roundPanel.HideInstant();
             if (minigameStage != null) minigameStage.HideInstant();
             if (revealPanel != null) revealPanel.HideInstant();
             if (winnerPanel != null) winnerPanel.HideInstant();
-            if (scoreboard != null) scoreboard.LeaderChanged += OnLeaderChanged;
+            if (seatRail != null) seatRail.LeaderChanged += OnLeaderChanged;
             if (minigameStage != null) minigameStage.LevelFinished += OnLevelFinished;
+            PlayerData.RosterChanged += OnRosterChanged;
 
             VoiceLines.Play(VoiceKeys.GameStart);
 
@@ -67,8 +76,9 @@ namespace Smartest.UI
         private void OnDestroy()
         {
             GameState.Spawned -= OnGameStateSpawned;
+            PlayerData.RosterChanged -= OnRosterChanged;
             Unbind();
-            if (scoreboard != null) scoreboard.LeaderChanged -= OnLeaderChanged;
+            if (seatRail != null) seatRail.LeaderChanged -= OnLeaderChanged;
             if (minigameStage != null) minigameStage.LevelFinished -= OnLevelFinished;
         }
 
@@ -100,15 +110,56 @@ namespace Smartest.UI
         private void Update()
         {
             if (!_bound || _gs == null || !_gs.IsSpawned) return;
-            if (_gs.Phase.Value != GamePhase.Answering) return;
-
+            var phase = _gs.Phase.Value;
+            var def = _gs.CurrentDef;
             float remaining = _gs.RemainingSeconds;
-            if (roundPanel != null) roundPanel.Tick(remaining, _gs.PhaseDuration.Value);
+
+            if (phase == GamePhase.RoundIntro)
+            {
+                if (def != null && def.IsMinigame)
+                {
+                    if (minigameStage != null && _gs.PhaseDuration.Value > 0f)
+                        minigameStage.SetFuse(remaining / _gs.PhaseDuration.Value);
+                }
+                else if (roundPanel != null) roundPanel.SetOpensIn(remaining);
+                return;
+            }
+
+            if (phase != GamePhase.Answering) return;
+
+            if (roundPanel != null)
+            {
+                roundPanel.Tick(remaining, _gs.PhaseDuration.Value);
+                roundPanel.SetPicked(LockedCount(), PlayerData.All.Count);
+            }
             if (!_timerTenFired && remaining <= 10f && _gs.PhaseDuration.Value > 10f)
             {
                 _timerTenFired = true;
                 VoiceLines.Play(VoiceKeys.TimerTen);
             }
+            // "That's everybody. No takebacks." belongs to the moment the last answer lands,
+            // not to the reveal, where the reveal's own line would cut it off anyway.
+            if (!_lockedLineFired && PlayerData.All.Count > 0 && LockedCount() == PlayerData.All.Count)
+            {
+                _lockedLineFired = true;
+                VoiceLines.Play(VoiceKeys.TimerLocked);
+            }
+        }
+
+        private static int LockedCount()
+        {
+            int n = 0;
+            var all = PlayerData.All;
+            for (int i = 0; i < all.Count; i++) if (all[i].LockedIn.Value) n++;
+            return n;
+        }
+
+        private void SetHud(bool on)
+        {
+            if (hud == null) return;
+            hud.alpha = on ? 1f : 0f;
+            hud.blocksRaycasts = on;
+            hud.interactable = on;
         }
 
         // ------------------------------------------------------------------
@@ -120,8 +171,14 @@ namespace Smartest.UI
             // The definition or level changed while (or right before) the intro — refresh.
             if (phase == GamePhase.RoundIntro || phase == GamePhase.Answering)
                 PopulateRound();
-            if (roundCounter != null)
-                roundCounter.text = _gs.CurrentDef != null ? $"ROUND {_gs.RoundIndex.Value}" : string.Empty;
+            UpdateMasthead();
+        }
+
+        private void UpdateMasthead()
+        {
+            if (masthead == null || _gs == null) return;
+            var def = _gs.CurrentDef;
+            masthead.SetRound(_gs.RoundIndex.Value, def != null && def.IsMinigame, _gs.TieBreak.Value);
         }
 
         private void PopulateRound()
@@ -131,14 +188,33 @@ namespace Smartest.UI
 
             if (def.IsMinigame)
             {
-                if (minigameStage != null) minigameStage.ShowIntro(def.title, def.ruleText);
+                // The registry is the source of truth for a minigame's rule (the level screen
+                // reads it from there too); the asset copy only updates on Build Scenes.
+                var entry = MinigameRegistry.Get(def.minigameId);
+                if (minigameStage != null)
+                    minigameStage.ShowIntro(entry, def.title, entry != null ? entry.Rule : def.ruleText, PlayerData.All.Count);
             }
             else if (roundPanel != null)
             {
-                roundPanel.ShowRound(def, _gs.SubRound.Value, _gs.TieBreak.Value);
+                roundPanel.ShowRound(def, _gs.SubRound.Value, _gs.TieBreak.Value, TieSentence());
+                roundPanel.SetPicked(LockedCount(), PlayerData.All.Count);
             }
+            UpdateMasthead();
+        }
 
-            if (roundCounter != null) roundCounter.text = $"ROUND {_gs.RoundIndex.Value}";
+        /// <summary>"Ayşe and Mert are both on 104. Everyone plays this round."</summary>
+        private string TieSentence()
+        {
+            if (_gs == null || !_gs.TieBreak.Value) return string.Empty;
+            int top = int.MinValue;
+            foreach (var p in PlayerData.All) top = Mathf.Max(top, p.Score.Value);
+            var names = new List<string>();
+            foreach (var p in PlayerData.All) if (p.Score.Value == top) names.Add(p.DisplayName);
+            if (names.Count < 2) return "Level at the top. Everyone plays this round.";
+            string who = names.Count == 2
+                ? $"{names[0]} and {names[1]} are both"
+                : string.Join(", ", names.GetRange(0, names.Count - 1)) + $" and {names[names.Count - 1]} are all";
+            return $"{who} on {top}. Everyone plays this round.";
         }
 
         private void OnPhase(GamePhase phase)
@@ -147,12 +223,17 @@ namespace Smartest.UI
             _shownPhase = phase;
             var def = _gs.CurrentDef;
             bool minigame = def != null && def.IsMinigame;
+            UpdateMasthead();
 
             switch (phase)
             {
                 case GamePhase.RoundIntro:
+                    SetHud(true);
                     _timerTenFired = false;
+                    _lockedLineFired = false;
                     _wasPlayingLevel = false;
+                    _minigameStartCount = minigame ? _gs.AliveCount.Value : 0;
+                    _lastTwoAnnounced = false;
                     if (revealPanel != null && revealPanel.IsShown) revealPanel.Hide();
                     if (winnerPanel != null && winnerPanel.IsShown) winnerPanel.Hide();
                     PopulateRound();
@@ -187,7 +268,7 @@ namespace Smartest.UI
                     break;
 
                 case GamePhase.LevelResult:
-                    if (minigameStage != null) minigameStage.ShowLevelResult(_gs.LevelLine.Value.ToString());
+                    ShowLevelResult();
                     OnLevelResolved();
                     break;
 
@@ -215,9 +296,28 @@ namespace Smartest.UI
                     if (roundPanel != null && roundPanel.IsShown) roundPanel.Hide();
                     if (minigameStage != null && minigameStage.IsShown) minigameStage.Hide();
                     if (revealPanel != null && revealPanel.IsShown) revealPanel.Hide();
+                    if (hostCaption != null) hostCaption.Hide();
+                    SetHud(false);
                     ShowWinner();
                     break;
             }
+        }
+
+        private void OnRosterChanged()
+        {
+            if (!_bound || _gs == null || !_gs.IsSpawned) return;
+            var phase = _gs.Phase.Value;
+
+            // A player's own PlayState can land a moment after the phase flip. If the level was
+            // built for the wrong role and hasn't started, build it again for the right one.
+            if (phase == GamePhase.Play && minigameStage != null && !minigameStage.LevelBegun)
+            {
+                var local = PlayerData.Local;
+                bool playing = local != null && local.IsPlayingLevel;
+                if (playing != _wasPlayingLevel) StartLevel();
+            }
+            // Likewise the list of who just went out.
+            if (phase == GamePhase.LevelResult) ShowLevelResult();
         }
 
         // ------------------------------------------------------------------
@@ -231,15 +331,47 @@ namespace Smartest.UI
 
             var local = PlayerData.Local;
             bool playing = local != null && local.IsPlayingLevel;
+            bool stillIn = local != null && local.IsStillIn;
             _wasPlayingLevel = playing;
 
             if (!minigameStage.IsShown) minigameStage.Show();
             minigameStage.StartLevel(entry, _gs.SubRound.Value, _gs.MinigameSeed.Value, playing,
-                _gs.AliveCount.Value, _gs.LevelStartsIn, entry.LevelSeconds, _gs.LevelTieBreak.Value);
+                _gs.AliveCount.Value, _gs.LevelStartsIn, entry.LevelSeconds, _gs.LevelTieBreak.Value, stillIn);
+            minigameStage.SetAlive(StillIn());
 
+            // "Down to two" is news only once, and only if there used to be more of you —
+            // in a two-player game it's been two since the start.
+            bool downToTwo = _gs.AliveCount.Value == 2 && _minigameStartCount > 2 && !_lastTwoAnnounced;
             if (_gs.LevelTieBreak.Value) VoiceLines.Play(VoiceKeys.MinigameTieBreak);
-            else if (_gs.AliveCount.Value == 2) VoiceLines.Play(VoiceKeys.MinigameLastTwo);
+            else if (downToTwo) { _lastTwoAnnounced = true; VoiceLines.Play(VoiceKeys.MinigameLastTwo); }
             else if (_gs.SubRound.Value > 1) VoiceLines.Play(VoiceKeys.LevelUp);
+        }
+
+        private static List<(string, bool)> StillIn()
+        {
+            var names = new List<string>();
+            foreach (var p in PlayerData.All) names.Add(p.DisplayName);
+            var monos = Monogram.ForAll(names);
+            var list = new List<(string, bool)>();
+            for (int i = 0; i < PlayerData.All.Count; i++)
+                if (PlayerData.All[i].IsStillIn) list.Add((monos[i], PlayerData.All[i].IsOwner));
+            return list;
+        }
+
+        private void ShowLevelResult()
+        {
+            if (minigameStage == null || _gs == null) return;
+            int level = _gs.SubRound.Value;
+            var names = new List<string>();
+            foreach (var p in PlayerData.All) names.Add(p.DisplayName);
+            var monos = Monogram.ForAll(names);
+            var outNow = new List<(string, string)>();
+            for (int i = 0; i < PlayerData.All.Count; i++)
+                if (PlayerData.All[i].OutAtLevel.Value == level && level > 0) outNow.Add((names[i], monos[i]));
+
+            int left = Mathf.Max(0, _gs.AliveCount.Value - outNow.Count);
+            bool solo = PlayerData.All.Count <= 1;
+            minigameStage.ShowLevelResult(_gs.LevelOutcome.Value, _gs.LevelLine.Value.ToString(), outNow, left, solo);
         }
 
         /// <summary>The beat between levels: who's out, who survived, or "everyone, again".</summary>
@@ -269,7 +401,10 @@ namespace Smartest.UI
         private bool LocalIsStillIn()
         {
             var local = PlayerData.Local;
-            return local != null && local.IsStillIn;
+            if (local == null) return false;
+            // At the level result the ladder has spoken but PlayState hasn't caught up yet.
+            if (_gs != null && local.OutAtLevel.Value > 0 && local.OutAtLevel.Value == _gs.SubRound.Value) return false;
+            return local.IsStillIn;
         }
 
         private void OnLevelFinished(bool failed, int metric)
@@ -300,13 +435,16 @@ namespace Smartest.UI
 
             if (def != null && def.IsMinigame)
             {
+                // The line ("Burak takes it.") is the headline; no need to say it twice.
                 Sounds.Play(Sounds.Kind.Good);
                 if (results.Count >= 2) VoiceLines.Play(VoiceKeys.MinigameWinner);
                 return;
             }
 
+            // The round's own verdict goes in the host's bubble; a recorded line replaces it.
+            if (hostCaption != null && !string.IsNullOrEmpty(line)) hostCaption.Say(line, 4.5f);
+
             // Voice: order matters — the "everyone lost" line always plays; the others are chance-based.
-            VoiceLines.Play(VoiceKeys.TimerLocked);
             if (results.Count == 0) return;
 
             bool allSame = true, allLost = true, nobodyAnswered = true;
@@ -396,14 +534,16 @@ namespace Smartest.UI
             var players = PlayerData.All;
             var winner = PlayerData.Get(_gs.WinnerClientId.Value);
             bool isHost = NetSession.Instance != null && NetSession.Instance.IsHost;
-            if (winnerPanel != null)
-            {
-                winnerPanel.ShowWinner(winner, players, isHost);
-                if (!winnerPanel.IsShown) winnerPanel.Show();
-            }
+
             Sounds.Play(Sounds.Kind.Fanfare);
             VoiceLines.Play(VoiceKeys.Winner);
             if (players.Count >= 3) VoiceLines.PlayDelayed(VoiceKeys.WinnerLastPlace, 1.5f);
+
+            if (winnerPanel != null)
+            {
+                winnerPanel.ShowWinner(winner, players, isHost, _gs.RoundIndex.Value, VoiceLines.TextOf(VoiceKeys.Winner));
+                if (!winnerPanel.IsShown) winnerPanel.Show();
+            }
         }
 
         private void OnLeaderChanged(ulong newLeader)

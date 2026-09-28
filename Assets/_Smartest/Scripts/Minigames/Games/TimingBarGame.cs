@@ -32,10 +32,12 @@ namespace Smartest.Minigames
                 case 2: _zoneWidth = 0.20f; break;
                 case 3: _zoneWidth = 0.14f; break;
                 case 4: _zoneWidth = 0.11f; break;
-                default: _zoneWidth = Mathf.Max(0.05f, 0.09f - (Level - 5) * 0.01f); break;
+                default: _zoneWidth = Mathf.Max(0.07f, 0.09f - (Level - 5) * 0.01f); break;
             }
             _zoneCentre = RandomRange(0.25f, 0.75f);
-            _speed = Level <= 2 ? 0.35f : (Level == 3 ? 0.55f : Mathf.Min(1.3f, 0.7f + (Level - 4) * 0.12f));
+            // Floors keep the marker inside the zone for at least ~35 ms per pass. The old ones
+            // (5 % at 1.3) gave 19 ms — about one frame, so hitting it was down to frame luck.
+            _speed = Level <= 2 ? 0.35f : (Level == 3 ? 0.55f : Mathf.Min(1.0f, 0.7f + (Level - 4) * 0.12f));
             _drift = Level >= 4 ? RandomRange(0.04f, 0.10f) : 0f;
 
             var zone = UiKit.Box(track.transform, "Zone", new Vector2(_trackW * _zoneWidth, 56f), Vector2.zero, Palette.Accent);

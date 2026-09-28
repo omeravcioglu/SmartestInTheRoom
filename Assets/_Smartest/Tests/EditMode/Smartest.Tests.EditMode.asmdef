@@ -4,7 +4,10 @@
     "references": [
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "Smartest"
+        "Smartest",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro",
+        "Unity.Netcode.Runtime"
     ],
     "includePlatforms": [
         "Editor"

@@ -34,6 +34,8 @@ namespace Smartest.Minigames
         public bool RepeatHarder;
         /// <summary>A dead heat decided who goes out: only these players play the next level.</summary>
         public bool TieBreak;
+        /// <summary>A warm-up level everybody cleared: nobody goes out, everyone plays on.</summary>
+        public bool AllThrough;
         public List<ulong> TiedPlayers = new List<ulong>();
         /// <summary>The minigame is over.</summary>
         public bool Finished;
@@ -48,8 +50,11 @@ namespace Smartest.Minigames
     /// be unit-tested exhaustively:
     ///
     ///  - fail a level and you are out of this minigame (you keep your score);
-    ///  - if nobody fails, the worst player by the level's own metric goes out, so every
-    ///    level removes someone and the game always ends;
+    ///  - the first few levels are warm-ups: if nobody fails one, everybody plays on. Without
+    ///    them a two-player minigame was decided on level one, the easiest, by whoever was a
+    ///    few milliseconds slower — the rest of the difficulty ramp was never played;
+    ///  - after the warm-up, if nobody fails, the worst player by the level's own metric goes
+    ///    out, so every level removes someone and the game always ends;
     ///  - if everyone fails, nobody goes out and the same players replay one notch harder;
     ///  - a dead heat for the elimination spot is broken by an extra level between exactly
     ///    those players — never by a coin flip;
@@ -73,6 +78,8 @@ namespace Smartest.Minigames
 
         public MetricOrder Order { get; }
         public int MaxLevels { get; }
+        /// <summary>Levels on which only failing knocks you out.</summary>
+        public int WarmUpLevels { get; }
         /// <summary>1-based; also the difficulty handed to the game's level generator.</summary>
         public int Level { get; private set; } = 1;
         public bool InTieBreak { get; private set; }
@@ -83,10 +90,11 @@ namespace Smartest.Minigames
         /// <summary>Who plays the next level — everyone alive, or just the tied players.</summary>
         public IReadOnlyList<ulong> Participants => _participants;
 
-        public EliminationLadder(IEnumerable<ulong> players, MetricOrder order, int maxLevels = 20)
+        public EliminationLadder(IEnumerable<ulong> players, MetricOrder order, int maxLevels = 20, int warmUpLevels = 0)
         {
             Order = order;
             MaxLevels = Math.Max(1, maxLevels);
+            WarmUpLevels = Math.Max(0, warmUpLevels);
             if (players != null)
                 foreach (var p in players) if (!_alive.Contains(p)) _alive.Add(p);
             _participants.AddRange(_alive);
@@ -98,12 +106,16 @@ namespace Smartest.Minigames
 
         private int WorstPossible => Order == MetricOrder.LowerIsBetter ? int.MaxValue : int.MinValue;
 
-        /// <summary>A player left the game. If that leaves one player, they win.</summary>
+        /// <summary>
+        /// A player left the game. If that leaves one player, they win. Participants are
+        /// only trimmed here, never refilled: a level may be running, and anyone added now
+        /// would be marked as a fail for a level they were only watching. Submit sorts out
+        /// a play-off that lost its players.
+        /// </summary>
         public void Remove(ulong clientId)
         {
             _alive.Remove(clientId);
             _participants.Remove(clientId);
-            if (_participants.Count == 0) { _participants.Clear(); _participants.AddRange(_alive); InTieBreak = false; }
             if (_alive.Count <= 1) Finished = true;
         }
 
@@ -113,6 +125,24 @@ namespace Smartest.Minigames
             if (Finished)
             {
                 FinishInto(step);
+                return step;
+            }
+
+            // A play-off needs two players. If the others left, leaving settled it: nobody
+            // goes out on this level and everyone still in plays the next one. Without this,
+            // a lone survivor of a play-off would be "tied with themselves" and replay alone
+            // until the level cap.
+            if (InTieBreak && _participants.Count < 2)
+            {
+                InTieBreak = false;
+                _participants.Clear();
+                _participants.AddRange(_alive);
+                Level++;
+                if (Level > MaxLevels)
+                {
+                    Finished = true;
+                    FinishInto(step);
+                }
                 return step;
             }
 
@@ -149,6 +179,11 @@ namespace Smartest.Minigames
             {
                 // Everyone failed — nobody leaves, the level comes back harder.
                 step.RepeatHarder = true;
+            }
+            else if (survivors == res.Count && Level <= WarmUpLevels)
+            {
+                // A warm-up level everyone cleared: nobody goes out, the next one is harder.
+                step.AllThrough = true;
             }
             else if (survivors == res.Count)
             {

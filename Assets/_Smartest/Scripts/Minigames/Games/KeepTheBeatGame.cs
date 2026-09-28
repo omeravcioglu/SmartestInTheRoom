@@ -52,11 +52,12 @@ namespace Smartest.Minigames
 
         protected override void OnTick(float dt)
         {
-            // The four lead beats flash; after that the player is on their own.
+            // The four lead beats flash and click; after that the player is on their own.
             while (_pulsesPlayed < LeadBeats && Elapsed >= _pulsesPlayed * _interval)
             {
                 _flashUntil = Elapsed + Mathf.Min(0.12f, _interval * 0.4f);
                 _pulsesPlayed++;
+                Sounds.Play(Sounds.Kind.Tick);
                 if (_pulsesPlayed == LeadBeats && _label != null) _label.text = "Keep going";
             }
             if (_pulse != null)
@@ -67,7 +68,9 @@ namespace Smartest.Minigames
 
             if (!CanAct || !KeyInput.SpacePressed()) return;
 
-            if (Elapsed < LeadBeats * _interval - _tolerance) { Fail("TOO EARLY"); return; }
+            // Tapping along with the lead beats is how people find a rhythm, and the rule
+            // says "keep pressing" — so those taps are free. Scoring starts at beat five.
+            if (Elapsed < LeadBeats * _interval - _tolerance) return;
 
             float expected = ExpectedAt(_pressed);
             float err = Mathf.Abs(Elapsed - expected);
