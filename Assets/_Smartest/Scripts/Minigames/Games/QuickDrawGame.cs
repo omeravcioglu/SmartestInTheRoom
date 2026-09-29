@@ -43,9 +43,10 @@ namespace Smartest.Minigames
                 case 1: golds = 3; reds = 0; minDelay = 1.0f; maxDelay = 2.2f; _window = 1.5f; _r = 50f; break;
                 case 2: golds = 4; reds = 0; minDelay = 0.9f; maxDelay = 2.6f; _window = 1.2f; _r = 44f; break;
                 case 3: golds = 5; reds = 0; minDelay = 0.8f; maxDelay = 2.6f; _window = 1.0f; _r = 38f; break;
-                case 4: golds = 5; reds = 1; minDelay = 0.8f; maxDelay = 2.6f; _window = 0.9f; _r = 34f; break;
+                // Waits shorten as reds are added, so the slowest possible run still fits the level.
+                case 4: golds = 5; reds = 1; minDelay = 0.8f; maxDelay = 2.4f; _window = 0.9f; _r = 34f; break;
                 default:
-                    golds = 5; reds = 2; minDelay = 0.6f; maxDelay = 2.4f;
+                    golds = 5; reds = 2; minDelay = 0.6f; maxDelay = 2.0f;
                     _window = Mathf.Max(0.6f, 0.8f - (Level - 5) * 0.03f);
                     _r = Mathf.Max(24f, 30f - (Level - 5));
                     break;
@@ -82,6 +83,7 @@ namespace Smartest.Minigames
         {
             _showing = false;
             _target.gameObject.SetActive(false);
+            _label.text = "WAIT FOR IT";
             _index++;
             if (_index < _draws.Length) _appearAt = Elapsed + _draws[_index].Delay;
         }
@@ -100,7 +102,7 @@ namespace Smartest.Minigames
                 _target.gameObject.SetActive(true);
                 _label.text = d.Red ? "HOLD YOUR FIRE" : "DRAW!";
             }
-            if (_showing && d.Red && Elapsed - _shownAt >= RedShow) { _label.text = "WAIT FOR IT"; Next(); return; }
+            if (_showing && d.Red && Elapsed - _shownAt >= RedShow) { Next(); return; }
 
             if (!CanAct)
             {
@@ -117,7 +119,6 @@ namespace Smartest.Minigames
             if (Vector2.Distance(click, d.Pos) > _r + 8f) return; // a miss: fire again
 
             _reactionSum += Elapsed - _shownAt;
-            _label.text = "WAIT FOR IT";
             Next();
             if (_index >= _draws.Length)
             {

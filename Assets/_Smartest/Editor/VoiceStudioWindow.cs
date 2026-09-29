@@ -63,6 +63,35 @@ namespace Smartest.EditorTools
             w.Show();
         }
 
+        /// <summary>
+        /// "Record missing" without the window, then wire the clips in, using the key, voice and
+        /// settings this machine's Voice Studio already saved:
+        ///   Unity.exe -batchmode -projectPath . -executeMethod Smartest.EditorTools.VoiceStudioWindow.RecordMissingBatch -quit
+        /// Exits with code 1 if any line failed.
+        /// </summary>
+        public static void RecordMissingBatch()
+        {
+            var w = CreateInstance<VoiceStudioWindow>(); // OnEnable loads the saved settings
+            try
+            {
+                w.RefreshCounts();
+                w.QueueAll(onlyMissing: true);
+                Debug.Log($"[Voice Studio] {w._queue.Count} missing clip(s) to record.");
+                // The window's own loop, one request at a time; the last one also wires the clips.
+                while (w._queue.Count > 0 || w._inFlight != null)
+                {
+                    w.Update();
+                    System.Threading.Thread.Sleep(20);
+                }
+                Debug.Log($"[Voice Studio] {w._status}");
+                if (w._failed > 0) EditorApplication.Exit(1);
+            }
+            finally
+            {
+                DestroyImmediate(w);
+            }
+        }
+
         private void OnEnable()
         {
             _apiKey = EditorPrefs.GetString(PrefKey, "");

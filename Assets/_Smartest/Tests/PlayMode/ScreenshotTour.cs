@@ -39,6 +39,7 @@ namespace Smartest.Tests
         {
             { "bullseye", 1f },     // the level-1 target shows for 2 s, then it's gone
             { "memory_boxes", 1f }, // the boxes go dark at 2.5 s, the very frame of the usual shot
+            { "flash_point", 1.3f }, // the level-1 dot shows somewhere in 0.5-2.1 s, always at 1.3
         };
 
         private static float ShotAt(string game, float lead) =>

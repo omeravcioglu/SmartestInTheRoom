@@ -16,7 +16,7 @@ depends on what the rest of the room did. Red/Green, Yes/No, or a number from 1�
 rule under the question, never on a button. Five of them (Lowest Unique, Two Thirds, The Pot,
 Charity, Sus) only work with three or more players, so two-player matches are never dealt them.
 
-**Minigames (46).** Everyone plays the same level simultaneously. Fail and you're out of that
+**Minigames (54).** Everyone plays the same level simultaneously. Fail and you're out of that
 minigame. Levels 1–2 are warm-ups: clear one and you play on. From level 3, if nobody fails,
 the slowest goes. If everyone fails, the level comes back harder. Last one standing wins. 1st +20, 2nd +10, 3rd +5, last −5 — all three numbers live on
 GameConfig.
@@ -78,8 +78,8 @@ automatically. `GameState`, `GameUI`, `RoundDeck` and `SceneBuilder` are not tou
 2. **Tools ▸ Smartest ▸ Clean Up Retired Files** — the retired code is already gone; this now
    only offers the 16 unused pre-rewrite voice files (`<key>.mp3` without a number).
 3. **Tools ▸ Smartest ▸ Build Scenes** — keeps every generated file in step with the code (the
-   66 challenge assets, prefabs and both scenes). The 26 new minigames are only dealt once
-   this has made their assets.
+   74 challenge assets, prefabs and both scenes). A new minigame is only dealt once this has
+   made its asset (last run 28 Sep, after the 34 new ones).
 4. **Window ▸ General ▸ Test Runner** — EditMode ▸ Run All (158) and PlayMode ▸ Run All.
 5. Play from `Menu.unity`. Two instances (or two PCs) to see a real elimination.
 
@@ -92,8 +92,10 @@ automatically. `GameState`, `GameUI`, `RoundDeck` and `SceneBuilder` are not tou
 - Minigame feel. Every level ramp is a first draft, meant to be tuned by playing. Hiding the
   level until GO (see below) made the memory and flash games noticeably harder than before.
 
-116 of the 142 voice lines are recorded and wired. The 26 new minigame intros aren't yet
-(Tools ▸ Smartest ▸ Voice Studio); until then those games start without a line.
+All 150 voice lines are recorded and wired (the 34 new minigame intros on 28 Sep). New lines
+record from Tools ▸ Smartest ▸ Voice Studio ▸ Record missing, or without opening Unity:
+`Unity.exe -batchmode -projectPath . -executeMethod Smartest.EditorTools.VoiceStudioWindow.RecordMissingBatch -quit`
+(same saved key, voice and settings; records only what's missing, then wires it in).
 
 ## Known gaps and deliberate omissions
 
@@ -149,6 +151,23 @@ existed), sixteen more:
 Spotlight's torch is a round UI `Mask` that follows the cursor over a scene held still behind
 it. Echo's pads are plain boxes rather than kit cells, so its red and green are just colours.
 Backwards is `SimonGame` with a `Backwards` switch.
+
+And eight reflex games:
+
+| Game | What you do | Out when | Ranked by |
+|---|---|---|---|
+| Quick Draw | Wait, then click the gold target the instant it appears (red decoys from level 4) | clicking early, a red, or too slow | total reaction time |
+| Twins | Cards flip; click when one matches the card before (colours shuffled from level 4) | clicking a non-match, or missing a pair | total reaction time |
+| Whack | Whack-a-mole on a 3×3 board; gold yes, red never | a gold ducks unwhacked, or a red is hit | total reaction time |
+| Ruler Drop | Click the instant the ruler falls (bait twitches from level 4) | clicking early, or it falls through | total distance fallen |
+| Let Go | Hold the button, release the instant the circle turns red (blue baits from level 3) | letting go early, or too slow | total reaction time |
+| Statues | Red light, green light: hold to run, let go to freeze | still holding once STOP's grace is up | time to the finish |
+| Slice | Hold and slash through the gold before it lands; bombs ride along | a gold lands, or a bomb is sliced | total reaction time |
+| Colour Match | Click the pad matching the colour in the middle (pads swap from level 4) | wrong pad, or too slow | total reaction time |
+
+Signals never rely on red against green alone: Let Go and Statues say NOW / GO / STOP in words,
+Twins puts a number on every card, and Colour Match uses gold, blue, red and ink, which differ
+in brightness too. Every level's slowest possible run fits inside its deadline.
 
 Every level is built from the shared seed, so everyone plays the same one. The physics games
 (Keepy Uppy, Flap, Hover) step in fixed 1/240 s steps, so frame rate doesn't change the ball.
@@ -211,8 +230,8 @@ face, which is much wider: headlines shrink to fit and the round timer steps dow
 answer gap when a long question reaches it.
 
 **Seeing it without playing.** `Tests/PlayMode/ScreenshotTour.cs` ([Explicit]) plays a solo
-Local match and saves a PNG of every screen, all 20 minigames included (while the first one
-is live it starts each of the others on the same stage, then restarts the dealt level), then
+Local match and saves a PNG of every screen, every registered minigame included (while the first
+one is live it starts each of the others on the same stage, then restarts the dealt level), then
 stages what solo can't reach (a full rail, someone going out, watching, a dead heat, a tie-break):
 `Unity.exe -batchmode -projectPath . -runTests -testPlatform PlayMode -testFilter ScreenshotTour`
 (pictures in `Previews/`, or `$SMARTEST_SHOTS`).

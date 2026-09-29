@@ -362,6 +362,63 @@ namespace Smartest.Minigames
                 Rule = "Hold the mouse button to pour. Let go on the line. Spill over and you're out.",
                 Controls = "HOLD CLICK", ViewType = typeof(PourGame),
                 Order = MetricOrder.LowerIsBetter, LevelSeconds = 10f },
+
+            // ---------------- Reflexes ----------------
+            new MinigameEntry {
+                Id = "quick_draw", RoundId = 147, Title = "Quick Draw",
+                Prompt = "Wait for it.",
+                Rule = "Wait for the gold target, then click it fast. Click before it shows, or hit a red one, and you're out.",
+                Controls = "CLICK", ViewType = typeof(QuickDrawGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 20f },
+
+            new MinigameEntry {
+                Id = "twins", RoundId = 148, Title = "Twins",
+                Prompt = "Two in a row.",
+                Rule = "Cards flip one by one. Click the moment one matches the card before it. Don't click on a non-match.",
+                Controls = "CLICK", ViewType = typeof(TwinsGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 16f },
+
+            new MinigameEntry {
+                Id = "whack", RoundId = 149, Title = "Whack",
+                Prompt = "Gold ones only.",
+                Rule = "Moles pop up. Click the gold ones before they duck. Never click a red one.",
+                Controls = "CLICK", ViewType = typeof(WhackGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 12f },
+
+            new MinigameEntry {
+                Id = "ruler_drop", RoundId = 150, Title = "Ruler Drop",
+                Prompt = "Catch it quick.",
+                Rule = "Click the instant the ruler drops. The less it falls, the better. Click early and you're out.",
+                Controls = "CLICK", ViewType = typeof(RulerDropGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 18f },
+
+            new MinigameEntry {
+                Id = "let_go", RoundId = 151, Title = "Let Go",
+                Prompt = "Hold on. Hold on. Now.",
+                Rule = "Hold the mouse button. Let go the instant the circle turns red. Too early and you're out.",
+                Controls = "HOLD CLICK", ViewType = typeof(LetGoGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 18f },
+
+            new MinigameEntry {
+                Id = "statues", RoundId = 152, Title = "Statues",
+                Prompt = "Red light, green light.",
+                Rule = "Hold the button to run, let go to freeze. Run on green, freeze on red. Move on red and you're out.",
+                Controls = "HOLD CLICK", ViewType = typeof(StatuesGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 17f },
+
+            new MinigameEntry {
+                Id = "slice", RoundId = 153, Title = "Slice",
+                Prompt = "Slash the gold.",
+                Rule = "Hold the button and slash through the gold before it falls. Never slice a red bomb.",
+                Controls = "HOLD CLICK", ViewType = typeof(SliceGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 18f },
+
+            new MinigameEntry {
+                Id = "colour_match", RoundId = 154, Title = "Colour Match",
+                Prompt = "See it, click it.",
+                Rule = "A colour shows in the middle. Click the pad of the same colour, fast. Wrong pad and you're out.",
+                Controls = "CLICK", ViewType = typeof(ColourMatchGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 18f },
         };
 
         public static MinigameEntry Get(string id)

@@ -102,7 +102,8 @@ namespace Smartest.Minigames
                 _number.text = _values[_shown].ToString();
                 // Light numbers on the dark cards.
                 _number.color = ink.grayscale < 0.45f ? Palette.PaperHi : Palette.Ink;
-                if (_label.color != Palette.Red) { _label.text = "CLICK ON A PAIR"; _label.color = Palette.TextDim; }
+                _label.text = "CLICK ON A PAIR";
+                _label.color = Palette.TextDim;
             }
 
             // A quick squash on every flip, so a repeat still reads as a new card.

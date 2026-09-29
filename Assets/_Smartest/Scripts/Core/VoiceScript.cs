@@ -315,6 +315,14 @@ namespace Smartest.Core
                 { "spotlight",    "Spotlight. Lights off. Find the gold. Don't click the wrong one." },
                 { "tag",          "Tag. You're not it. Keep it that way." },
                 { "pour",         "Pour. Stop on the line. Not above it. Definitely not above it." },
+                { "quick_draw",   "Quick Draw. Hands still. Wait for it. Wait for it." },
+                { "twins",        "Twins. Two the same in a row? Pounce." },
+                { "whack",        "Whack. Gold ones only. The red ones bite." },
+                { "ruler_drop",   "Ruler Drop. Catch it quick. Every inch counts." },
+                { "let_go",       "Let Go. Hold on. Hold on. Now. Or not yet." },
+                { "statues",      "Statues. Run on green, freeze on red. I'm watching." },
+                { "slice",        "Slice. Slash the gold, leave the bombs. You'll know if you don't." },
+                { "colour_match", "Colour Match. See it, click it. No thinking." },
             };
 
             var list = new List<Entry>();

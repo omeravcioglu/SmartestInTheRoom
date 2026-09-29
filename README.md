@@ -11,26 +11,28 @@ A match alternates two kinds of challenge (by default one question, then two min
 - **20 social rounds.** Everyone answers at the same time: Red/Green, Yes/No, or a number from 1 to 10. How many points you get depends on what everyone else chose. These are cooperate-or-betray dilemmas, so reading the room matters more than being right.
   - Every rule is meant to be a real decision: other players always change your result, and no answer is always best.
   - Rounds that need three or more players are never dealt in a two-player match.
-- **30 elimination minigames**, mostly quick mouse games with one line of rules: reaction, memory, timing, aim and nerve.
+- **54 elimination minigames**, quick games with one line of rules: reaction, reflexes, memory, timing, aim and nerve.
   - Everyone plays the *same* seeded level at the same time, and failing knocks you out.
   - Levels 1–2 are warm-ups. From level 3, if nobody fails, the slowest player goes. If everyone fails, the level comes back harder.
   - The last one standing wins. The payout is 1st +20, 2nd +10, 3rd +5 and last −5, all set in `GameConfig`.
 - Players are expected to talk over Discord, so there is no in-game chat. The game focuses on the decisions.
 
-**The 30 minigames:** Arrow Rush, Bullseye, Buzz Wire, Chase, Count the Dots, Dodge, Flap, Flash Point, Green Light, Hover, Keep the Beat, Keepy Uppy, Lasers, Memory Boxes, Mirror, Odd One Out, Pop, Press Your Luck, Quick Math, Shell Game, Simon, Sort It, Spot the Change, Stack, Steady Hand, Stop the Clock, Stroop, Timing Bar, Type It, Which Was First.
+**The 54 minigames:** Arrow Rush, Backwards, Bullseye, Buzz Wire, Catch, Chase, Chimp Test, Colour Match, Count the Dots, Decoy, Dodge, Echo, Fireflies, Flap, Flash Point, Goalie, Good Catch, Green Light, Hover, Keep the Beat, Keepy Uppy, Lasers, Let Go, Memory Boxes, Mirror, Odd One Out, Pairs, Pop, Pour, Press Your Luck, Quick Draw, Quick Math, Ring, Road, Ruler Drop, Runaway, Shell Game, Simon, Slice, Sort It, Spot the Change, Spotlight, Stack, Statues, Steady Hand, Stop the Clock, Stroop, Tag, Timing Bar, Toss, Twins, Type It, Whack, Which Was First.
+
+Signals never rely on red against green alone. Games say NOW / GO / STOP in words, number their cards, or use colors that also differ in brightness.
 
 **Status:** playable prototype, reworked after the first playtest in September 2026.
 - The first playtest found the questions too wordy and the minigames the most fun, which led to:
   - two minigames per question;
-  - ten new mouse minigames;
+  - 34 new minigames (mouse, catching and reflex games);
   - a full UI rebuild in the Tabloid style;
   - a review pass that fixed more than 20 bugs and rewrote the weak rounds.
-- The voiced host (116 of 126 lines recorded), 158 EditMode tests and PlayMode smoke tests exist.
+- The voiced host (all 150 lines recorded), 158 EditMode tests and PlayMode smoke tests exist.
 - Still open (see [`docs/SMARTEST_STATUS.md`](docs/SMARTEST_STATUS.md)):
   - Only the solo host loop has been run end to end. A match across two machines hasn't been tested yet.
   - Online play over Relay is untested.
   - Difficulty ramps are first drafts.
-  - The ten newest minigames have no voiced intro yet, and there's no music yet.
+  - There's no music yet.
 
 ## Tabloid UI
 
@@ -60,14 +62,14 @@ The whole interface is drawn in a newspaper style:
 
 ## What I built
 
-All game code lives in **`Assets/_Smartest/`**: 98 C# scripts, about 20k lines.
+All game code lives in **`Assets/_Smartest/`**: 121 C# scripts, about 23k lines.
 
 | System | Key scripts |
 |---|---|
 | Match flow: host-authoritative state machine (lobby → question / minigames → reveal → scoring → winner) | `Scripts/Rounds/GameState.cs` |
 | Social rounds: scoring rules as data, round catalog and deck | `Scripts/Rounds/Resolvers.cs`, `RoundCatalog.cs`, `RoundDeck.cs` |
 | Minigame framework: warm-up and elimination rules, payouts, shared seeded levels, one stage for every game, drawing kit | `Scripts/Minigames/Core/EliminationLadder.cs`, `PayoutTable.cs`, `LevelRng.cs`, `MinigameRegistry.cs`, `MinigameView.cs`, `MinigameStage.cs`, `UiKit.cs`, `KitWatch.cs` |
-| The 30 minigames (one class each) | `Scripts/Minigames/Games/*.cs` |
+| The 54 minigames (one class each) | `Scripts/Minigames/Games/*.cs` |
 | Tabloid UI kit: color and type tokens, code-drawn ink art, stickers, stamps, headlines and effects | `Scripts/Core/Palette.cs`, `Typo.cs`, `FontSet.cs`, `Scripts/UI/Kit/InkSprites.cs`, `Ink.cs`, `HardShadow.cs`, `TextDrop.cs`, `Burst.cs` |
 | HUD: masthead, race to 100, seat rail and seat cards, host caption | `Scripts/UI/Hud/*` |
 | Networking and lobby | `Scripts/Net/NetSession.cs`, `PlayerData.cs`, `Scripts/UI/MenuUI.cs`, `LobbyUI.cs`, `LobbySeat.cs` |
@@ -77,8 +79,8 @@ All game code lives in **`Assets/_Smartest/`**: 98 C# scripts, about 20k lines.
 | Tests | EditMode: `ResolverTests`, `MinigameTests`, `DeckTests`, `TabloidTests`, `VoiceScriptTests`. PlayMode: `MatchFlowTests`, `MinigameSmokeTests`, `ScreenshotTour` |
 
 The editor tooling covers:
-- **`SceneBuilder`:** a one-click (and headless) builder that regenerates both scenes, the prefabs, the ink art, the font assets and all 50 challenge assets from code.
-- **Voice tools:** a voice-line recording studio and the wiring of the recorded lines.
+- **`SceneBuilder`:** a one-click (and headless) builder that regenerates both scenes, the prefabs, the ink art, the font assets and all 74 challenge assets from code.
+- **Voice tools:** a voice-line recording studio that can also record missing lines headless from the command line, and the wiring of the recorded lines.
 - **`RetiredFileCleanup`:** a cleanup tool for files retired in the redesign.
 
 ### Code highlights
@@ -124,6 +126,6 @@ This is almost entirely original code and code-drawn art. Imported content:
 
 ## About this repository
 
-This public repository is a **showcase**. It contains the documentation and the **120 source files I wrote** for this project. The complete project, including licensed third-party assets that cannot be redistributed, is kept in a private repository.
+This public repository is a **showcase**. It contains the documentation and the **126 source files I wrote** for this project. The complete project, including licensed third-party assets that cannot be redistributed, is kept in a private repository.
 
 Copyright © Omer Avcioglu (McHunter Studio). **All rights reserved.** Viewing only; see [LICENSE](LICENSE).
