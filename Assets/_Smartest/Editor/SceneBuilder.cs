@@ -450,9 +450,12 @@ namespace Smartest.EditorTools
                 new EditorBuildSettingsScene(MenuScenePath, true),
                 new EditorBuildSettingsScene(GameScenePath, true)
             };
+            // Keep other scenes of our own; drop the project template's SampleScene and the like,
+            // which would otherwise ship in the build.
             foreach (var s in EditorBuildSettings.scenes)
             {
                 if (s.path == MenuScenePath || s.path == GameScenePath) continue;
+                if (!s.path.StartsWith(Root + "/")) continue;
                 list.Add(s);
             }
             EditorBuildSettings.scenes = list.ToArray();
