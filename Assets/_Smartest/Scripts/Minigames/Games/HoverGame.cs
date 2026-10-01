@@ -110,6 +110,7 @@ namespace Smartest.Minigames
                 if (_y < -limit) { _y = -limit; _v = 0f; }
             }
             _dot.anchoredPosition = new Vector2(0f, _trackY + _y);
+            Progress("STAY IN", t / _hold);
 
             float off = Mathf.Abs(_y - zone);
             _distSum += off * dt;

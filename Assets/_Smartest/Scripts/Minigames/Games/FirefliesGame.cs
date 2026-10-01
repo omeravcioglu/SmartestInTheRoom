@@ -71,6 +71,7 @@ namespace Smartest.Minigames
 
             _label = UiKit.Label(Area, "Hint", "TOUCH THEM ALL", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            Progress("CAUGHT", 0, n);
         }
 
         private Vector2 PathAt(in Fly f, float t) =>
@@ -110,6 +111,7 @@ namespace Smartest.Minigames
                     f.CaughtAt = Elapsed;
                     f.Image.color = Palette.Green;
                     _caught++;
+                    Progress("CAUGHT", _caught, _flies.Length);
                 }
             }
 

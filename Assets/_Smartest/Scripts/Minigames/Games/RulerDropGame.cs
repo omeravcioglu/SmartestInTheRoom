@@ -69,6 +69,7 @@ namespace Smartest.Minigames
             _dropAt = _delays[0];
             _label = UiKit.Label(Area, "Hint", "CATCH IT WHEN IT DROPS", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            Progress("CAUGHT", 0, drops);
         }
 
         protected override void OnTick(float dt)
@@ -108,6 +109,7 @@ namespace Smartest.Minigames
                 _label.text = Mathf.RoundToInt(_fallen) + " PX";
                 _label.color = Palette.Green;
                 _drop++;
+                Progress("CAUGHT", _drop, _delays.Length);
                 if (_drop >= _delays.Length && CanAct)
                 {
                     // Tenths of a pixel: whole pixels would tie, and a tie means a play-off.

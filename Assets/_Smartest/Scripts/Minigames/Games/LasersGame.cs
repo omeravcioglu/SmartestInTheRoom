@@ -95,6 +95,7 @@ namespace Smartest.Minigames
 
             _label = UiKit.Label(Area, "Hint", Interactive ? "GET IN THE BOX" : "MIND THE BEAMS", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            Progress("BEAMS", 0, n);
         }
 
         /// <summary>Two red bars with the gap between them, parked just outside the box.</summary>
@@ -191,6 +192,10 @@ namespace Smartest.Minigames
                 if (clearance < _closest) _closest = clearance;
             }
             _last = cursor;
+
+            int passed = 0;
+            for (int i = 0; i < _beams.Length; i++) if (t > _beams[i].Start + _duration) passed++;
+            Progress("BEAMS", passed, _beams.Length);
 
             var last = _beams[_beams.Length - 1];
             if (t > last.Start + _duration)

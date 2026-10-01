@@ -55,6 +55,8 @@ namespace Smartest.Minigames
             Elapsed = 0f;
             Running = false;
             IsDone = false;
+            Progressed = default;
+            TriesLeft = default;
             if (Area != null) UiKit.Clear(Area);
             Build();
         }
@@ -109,6 +111,62 @@ namespace Smartest.Minigames
 
         /// <summary>Milliseconds, as an int, for the common "how fast were you" metric.</summary>
         protected int Ms(float seconds) => Mathf.RoundToInt(Mathf.Max(0f, seconds) * 1000f);
+
+        // ---- the level's scoreline ----
+
+        /// <summary>
+        /// Something a level says about how it's going: "3 of 8 caught", "2 shots left", or how
+        /// far along a run is. The stage shows it on the game panel; the rules never read it.
+        /// </summary>
+        public struct Reading
+        {
+            /// <summary>One or two words in capitals: "CAUGHT", "SHOTS". Empty means nothing to show.</summary>
+            public string Word;
+            public int Value;
+            public int Total;
+            /// <summary>0 to 1 for a run with nothing to count (a walk, a hold); negative for a count.</summary>
+            public float Fill;
+
+            public bool Shown => !string.IsNullOrEmpty(Word);
+            public bool IsBar => Fill >= 0f;
+        }
+
+        /// <summary>How far through the level this player is.</summary>
+        public Reading Progressed { get; private set; }
+        /// <summary>Attempts this player has left: shots, strokes, darts.</summary>
+        public Reading TriesLeft { get; private set; }
+        /// <summary>Either reading changed. Nobody has to listen.</summary>
+        public event Action ReadingChanged;
+
+        /// <summary>"3 of 8": things done out of things to do.</summary>
+        protected void Progress(string word, int done, int total)
+        {
+            var r = new Reading { Word = word, Value = Mathf.Clamp(done, 0, Mathf.Max(0, total)), Total = Mathf.Max(0, total), Fill = -1f };
+            if (Same(Progressed, r)) return;
+            Progressed = r;
+            ReadingChanged?.Invoke();
+        }
+
+        /// <summary>How far along a run with nothing to count is, 0 to 1.</summary>
+        protected void Progress(string word, float fill)
+        {
+            var r = new Reading { Word = word, Fill = Mathf.Clamp01(fill) };
+            if (Same(Progressed, r)) return;
+            Progressed = r;
+            ReadingChanged?.Invoke();
+        }
+
+        /// <summary>Attempts left out of the attempts you get.</summary>
+        protected void Tries(string word, int left, int total)
+        {
+            var r = new Reading { Word = word, Value = Mathf.Clamp(left, 0, Mathf.Max(0, total)), Total = Mathf.Max(0, total), Fill = -1f };
+            if (Same(TriesLeft, r)) return;
+            TriesLeft = r;
+            ReadingChanged?.Invoke();
+        }
+
+        private static bool Same(Reading a, Reading b) =>
+            a.Word == b.Word && a.Value == b.Value && a.Total == b.Total && Mathf.Abs(a.Fill - b.Fill) < 0.004f;
 
         /// <summary>Size of the drawing area. Games lay themselves out relative to this.</summary>
         protected Vector2 AreaSize

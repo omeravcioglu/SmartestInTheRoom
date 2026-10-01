@@ -47,6 +47,8 @@ namespace Smartest.Minigames
         [SerializeField] private TMP_Text leadInLabel;
         [SerializeField] private Burst timer;
         [SerializeField] private TMP_Text statusStamp;
+        [SerializeField] private Scoreline progressTab;
+        [SerializeField] private Scoreline triesTab;
 
         [Header("Level banner")]
         [SerializeField] private GameObject banner;
@@ -258,6 +260,7 @@ namespace Smartest.Minigames
                 {
                     _view.Init(contentArea);
                     _view.Finished += OnViewFinished;
+                    _view.ReadingChanged += ShowScoreline;
                     _view.Prepare(level, LevelRng.For(entry.Id, seed, level), levelSeconds, playing);
                 }
                 else
@@ -434,6 +437,7 @@ namespace Smartest.Minigames
                     Sounds.Play(Sounds.Kind.Go);
                     ShowLeadIn(false);
                     SetContentVisible(true);
+                    ShowScoreline();
                     if (_view != null) _view.Begin();
                 }
                 return;
@@ -479,11 +483,26 @@ namespace Smartest.Minigames
             if (_view != null)
             {
                 _view.Finished -= OnViewFinished;
+                _view.ReadingChanged -= ShowScoreline;
                 _view.Teardown();
                 Destroy(_view.gameObject);
                 _view = null;
             }
             if (contentArea != null) UiKit.Clear(contentArea);
+            if (progressTab != null) progressTab.Hide();
+            if (triesTab != null) triesTab.Hide();
+        }
+
+        /// <summary>
+        /// The level's own scoreline on the panel's tabs. Like the level itself it stays out of
+        /// sight until GO (a count of boxes to remember is part of the puzzle), and someone
+        /// watching gets none: the level they see is being played for them.
+        /// </summary>
+        private void ShowScoreline()
+        {
+            if (!_begun || !_playing || _view == null) return;
+            if (progressTab != null) progressTab.Show(_view.Progressed);
+            if (triesTab != null) triesTab.Show(_view.TriesLeft);
         }
 
         /// <summary>
@@ -497,7 +516,7 @@ namespace Smartest.Minigames
             if (string.IsNullOrWhiteSpace(controls)) return;
 
             string c = controls.Trim().ToUpperInvariant();
-            bool mouse = c.Contains("CLICK") || c.Contains("MOUSE");
+            bool mouse = c.Contains("CLICK") || c.Contains("MOUSE") || c.Contains("DRAG");
             if (mouse)
             {
                 var icon = Ink.Icon(row, "Mouse", InkSprites.Mouse, Color.white);
@@ -509,22 +528,24 @@ namespace Smartest.Minigames
             else if (c.Contains("+")) foreach (var k in c.Split('+')) keys.Add(k.Trim());
             else
             {
-                var words = c.Split(' ');
+                var words = c.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 bool letters = words.Length > 1;
                 foreach (var w in words) if (w.Length != 1) letters = false;
                 if (letters) keys.AddRange(words);
                 else keys.Add(c);
             }
+            bool keyboard = false;
             foreach (var k in keys)
             {
                 if (string.IsNullOrEmpty(k)) continue;
+                if (!k.Contains("CLICK") && !k.Contains("MOUSE") && !k.Contains("DRAG")) keyboard = true;
                 var cap = Ink.Key(row, "Key", k, size);
                 Ink.Unhug(Ink.BoxOf(cap));
             }
 
             if (withNote)
             {
-                string note = mouse ? "Mouse only" : c.Contains("TYPE") ? "Keyboard" : "Keyboard only";
+                string note = mouse && keyboard ? "Mouse or keyboard" : mouse ? "Mouse only" : c.Contains("TYPE") ? "Keyboard" : "Keyboard only";
                 var t = Ink.Text(row, "Note", note, TypeRole.Body, 22f, Palette.Ink2, TextAlignmentOptions.MidlineLeft).OneLine();
                 t.fontStyle |= FontStyles.Bold;
             }
@@ -718,6 +739,15 @@ namespace Smartest.Minigames
             bannerSentence.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             bannerLeft = Ink.Sticker(ban.transform, "Left", "3 LEFT", 32f, Palette.Gold, Palette.Ink, 5f, 3f);
             Ink.BoxOf(bannerLeft).Pin(1246f - 40f, 115f, new Vector2(1f, 0.5f));
+
+            // The level's scoreline: tabs riding the panel's top edge, what you've done on the
+            // left and what you have left on the right.
+            progressTab = Scoreline.Create(g, "ProgressTab", onPaper: false);
+            progressTab.Pin(PanelLeft + 30f, 9f, new Vector2(0f, 0.5f)).Tilt(-1.5f);
+            progressTab.gameObject.SetActive(false);
+            triesTab = Scoreline.Create(g, "TriesTab", onPaper: true);
+            triesTab.Pin(PanelLeft + PanelWidth - 30f, 9f, new Vector2(1f, 0.5f)).Tilt(1.5f);
+            triesTab.gameObject.SetActive(false);
 
             // The level clock.
             // Silent: some games (Keep the Beat) are played by ear.

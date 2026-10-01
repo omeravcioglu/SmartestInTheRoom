@@ -104,6 +104,7 @@ namespace Smartest.Minigames
             }
 
             if (d > _radius) { Fail("SLIPPED OFF"); return; }
+            Progress("STAY ON", moving / _hold);
             if (moving > 0f)
             {
                 _distSum += d * dt;

@@ -87,6 +87,7 @@ namespace Smartest.Minigames
             _glove = (RectTransform)UiKit.Box(Area, "Glove", new Vector2(GloveW, _gloveH), new Vector2(_gloveX, _centreY), Palette.Ink).transform;
             _label = UiKit.Label(Area, "Hint", "STOP EVERY SHOT", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            Progress("SAVED", 0, n);
         }
 
         /// <summary>Where a shot is, `age` seconds after it was struck (it keeps going past the glove).</summary>
@@ -123,6 +124,7 @@ namespace Smartest.Minigames
                         s.View.gameObject.SetActive(false);
                         _offSum += off;
                         _stopped++;
+                        Progress("SAVED", _stopped, _shots.Length);
                         continue;
                     }
                     if (CanAct)

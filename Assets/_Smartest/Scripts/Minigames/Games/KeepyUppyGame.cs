@@ -116,6 +116,7 @@ namespace Smartest.Minigames
                 Fail("DROPPED");
                 return;
             }
+            Progress("KEEP UP", Elapsed / _hold);
             if (Elapsed >= _hold)
             {
                 _label.text = "KEPT IT UP";

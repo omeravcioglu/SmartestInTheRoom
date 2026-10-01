@@ -23,6 +23,7 @@ namespace Smartest.Minigames
         private int _first = -1;
         private int _second = -1;
         private float _turnBackAt = -1f;
+        private int _pairs;
         private int _pairsLeft;
         private bool _hidden;
         private TMP_Text _label;
@@ -41,7 +42,8 @@ namespace Smartest.Minigames
             }
             _limit = 18f;
             int n = pairs * 2, rows = Mathf.CeilToInt(n / (float)cols);
-            _pairsLeft = pairs;
+            _pairs = _pairsLeft = pairs;
+            Progress("PAIRS", 0, pairs);
 
             var values = new int[n];
             for (int i = 0; i < n; i++) values[i] = i / 2 + 1;
@@ -120,6 +122,7 @@ namespace Smartest.Minigames
                 _cards[_first].color = Palette.Green;
                 _cards[_second].color = Palette.Green;
                 _first = _second = -1;
+                Progress("PAIRS", _pairs - (_pairsLeft - 1), _pairs);
                 if (--_pairsLeft == 0)
                 {
                     _label.text = "ALL MATCHED";

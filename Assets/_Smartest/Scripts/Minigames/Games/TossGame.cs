@@ -81,6 +81,7 @@ namespace Smartest.Minigames
 
             _label = UiKit.Label(Area, "Hint", "CLICK THEM IN THE AIR", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            Progress("HIT", 0, n);
         }
 
         private Vector2 PositionAt(in Throw k, float age) =>
@@ -139,6 +140,7 @@ namespace Smartest.Minigames
             _throws[best] = hit;
             _reactionSum += Elapsed - hit.Start;
             _hits++;
+            Progress("HIT", _hits, _throws.Count);
             if (_hits == _throws.Count)
             {
                 _label.text = "NOTHING LANDED";

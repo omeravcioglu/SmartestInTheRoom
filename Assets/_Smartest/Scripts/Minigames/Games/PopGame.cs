@@ -81,6 +81,7 @@ namespace Smartest.Minigames
 
             _label = UiKit.Label(Area, "Hint", "CLICK THE DOTS", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            Progress("POPPED", 0, n);
         }
 
         protected override void OnTick(float dt)
@@ -134,6 +135,7 @@ namespace Smartest.Minigames
                 t.Image.color = Palette.Green;
                 _reactionSum += age;
                 _popped++;
+                Progress("POPPED", _popped, _targets.Length);
                 if (_popped == _targets.Length)
                 {
                     _label.text = "ALL POPPED";

@@ -78,6 +78,7 @@ namespace Smartest.Minigames
 
             _label = UiKit.Label(Area, "Hint", "HOLD AND SLASH", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            Progress("SLICED", 0, _golds);
         }
 
         private void Add(float start, float halfW, float maxApex, bool bomb)
@@ -140,6 +141,7 @@ namespace Smartest.Minigames
                     k.Image.color = Palette.Green;
                     _reactionSum += age;
                     _cut++;
+                    Progress("SLICED", _cut, _golds);
                     _throws[i] = k;
                     continue;
                 }

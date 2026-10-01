@@ -123,6 +123,7 @@ namespace Smartest.Minigames
             }
 
             if (off > _width * 0.5f) { Fail("OFF THE ROAD"); return; }
+            Progress("DISTANCE", t / _hold);
             _distSum += off * dt;
             _timeSum += dt;
             if (t >= _hold)

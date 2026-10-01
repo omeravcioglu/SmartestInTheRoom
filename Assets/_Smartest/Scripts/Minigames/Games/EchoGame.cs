@@ -79,6 +79,7 @@ namespace Smartest.Minigames
             {
                 for (int i = 0; i < 4; i++) _pads[i].color = _dim[i];
                 _label.text = "YOUR TURN";
+                Progress("PLAYED", 0, _sequence.Count);
             }
 
             if (_flashPad >= 0 && Elapsed >= _flashUntil) { _pads[_flashPad].color = _dim[_flashPad]; _flashPad = -1; }
@@ -103,7 +104,8 @@ namespace Smartest.Minigames
                 Fail("WRONG COLOUR");
                 return;
             }
-            if (++_index < _sequence.Count) return;
+            Progress("PLAYED", ++_index, _sequence.Count);
+            if (_index < _sequence.Count) return;
 
             _label.text = "PERFECT";
             _label.color = Palette.Green;

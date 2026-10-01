@@ -59,6 +59,7 @@ namespace Smartest.Minigames
             UiKit.Box(Area, "Base", new Vector2(_topW, BlockH), new Vector2(0f, _baseY), Palette.Ink);
             _label = UiKit.Label(Area, "Hint", "CLICK TO DROP", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, size.y * 0.5f - 30f));
+            Progress("STACKED", 0, _count);
             SpawnBlock();
         }
 
@@ -125,6 +126,7 @@ namespace Smartest.Minigames
             _topW = overlap;
             _moving = null;
             _placed++;
+            Progress("STACKED", _placed, _count);
 
             if (_placed >= _count)
             {

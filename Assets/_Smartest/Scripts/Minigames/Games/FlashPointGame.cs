@@ -70,6 +70,7 @@ namespace Smartest.Minigames
 
             _label = UiKit.Label(Area, "Hint", count > 1 ? "WATCH BOTH" : "WATCH", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            if (count > 1) Progress("PLACED", 0, count);
         }
 
         protected override void OnTick(float dt)
@@ -97,6 +98,8 @@ namespace Smartest.Minigames
             float error = Vector2.Distance(local, _spots[i0]);
             UiKit.Dot(Area, "Click" + i0, 14f, local, Palette.Ink);
             _clicked++;
+            // One dot is one click: a count only says something once there are two.
+            if (_spots.Length > 1) Progress("PLACED", _clicked, _spots.Length);
             if (error > _tolerance)
             {
                 Reveal();

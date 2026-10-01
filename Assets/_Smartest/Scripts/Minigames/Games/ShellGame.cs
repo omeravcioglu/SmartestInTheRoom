@@ -136,6 +136,7 @@ namespace Smartest.Minigames
                 SetCup(CupIn(done.SlotA), _slotX[done.SlotA], _cupY);
                 SetCup(CupIn(done.SlotB), _slotX[done.SlotB], _cupY);
             }
+            Progress("SWAPS", _applied, _swaps.Length);
             if (i < _swaps.Length)
             {
                 var sw = _swaps[i];

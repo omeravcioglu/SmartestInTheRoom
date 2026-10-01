@@ -41,6 +41,7 @@ namespace Smartest.Minigames
         private float _basketX;
         private float _offSum;
         private int _caught;
+        private int _golds;
 
         /// <summary>Share of red balls: none here, some in Good Catch.</summary>
         protected virtual float RedShare => 0f;
@@ -105,7 +106,9 @@ namespace Smartest.Minigames
                 var img = UiKit.Dot(Area, "Ball" + i, BallR * 2f, new Vector2(x, _spawnY), red ? Palette.Red : Palette.Accent);
                 img.gameObject.SetActive(false);
                 _drops[i] = new Drop { X = x, Red = red, Spawn = spawn, View = (RectTransform)img.transform, Image = img };
+                if (!red) _golds++;
             }
+            Progress("CAUGHT", 0, _golds);
 
             _basketX = 0f;
             _basket = (RectTransform)UiKit.Box(Area, "Basket", new Vector2(_basketW, BasketH), new Vector2(0f, basketY), Palette.Ink).transform;
@@ -145,6 +148,7 @@ namespace Smartest.Minigames
                         d.View.gameObject.SetActive(false);
                         _offSum += off;
                         _caught++;
+                        Progress("CAUGHT", _caught, _golds);
                         continue;
                     }
                     else if (CanAct)

@@ -102,6 +102,7 @@ namespace Smartest.Minigames
 
             _label = UiKit.Label(Area, "Hint", "CLICK TO FLAP", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            Progress("GAPS", 0, n);
         }
 
         private float WallX(int i, float t) => FirstWall + i * Spacing - _speed * t;
@@ -150,6 +151,10 @@ namespace Smartest.Minigames
                 _y += _vy * PhysicsStep;
             }
             _bird.anchoredPosition = new Vector2(BirdX, _y);
+
+            int passed = 0;
+            for (int i = 0; i < _gapY.Length; i++) if (WallX(i, t) + WallW * 0.5f < BirdX - BirdR) passed++;
+            Progress("GAPS", passed, _gapY.Length);
 
             if (_y + BirdR > _top || _y - BirdR < _bottom) { Crash(); return; }
 

@@ -61,6 +61,7 @@ namespace Smartest.Minigames
                     if (_shown >= 0) _cells[_sequence[_shown]].color = Palette.Neutral;
                     _shown = -1;
                     if (_label != null) { _label.text = Backwards ? "NOW BACKWARDS" : "REPEAT IT"; _label.color = Palette.Text; }
+                    Progress("REPEATED", 0, _sequence.Count);
                     return;
                 }
                 if (step != _shown)
@@ -92,6 +93,7 @@ namespace Smartest.Minigames
 
             _cells[index].color = Palette.Green;
             _index++;
+            Progress("REPEATED", _index, _sequence.Count);
             if (_index < _sequence.Count) return;
 
             _label.text = "PERFECT";

@@ -55,6 +55,7 @@ namespace Smartest.Minigames
 
             _label = UiKit.Label(Area, "Hint", "START AT 1", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            Progress("FOUND", 0, n);
         }
 
         protected override void OnTick(float dt)
@@ -82,6 +83,7 @@ namespace Smartest.Minigames
             }
             _tiles[tile].gameObject.SetActive(false);
             _next++;
+            Progress("FOUND", _next - 1, _tiles.Length);
             if (_next > _tiles.Length)
             {
                 _label.text = "PERFECT";

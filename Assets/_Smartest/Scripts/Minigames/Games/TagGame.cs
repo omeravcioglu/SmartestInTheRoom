@@ -129,6 +129,7 @@ namespace Smartest.Minigames
             if (!CanAct) return;
 
             if (!_box.Contains(target)) { Fail("LEFT THE BOX"); return; }
+            Progress("STAY FREE", t / _hold);
             for (int i = 0; i < _p.Length; i++)
             {
                 float gap = Vector2.Distance(target, _p[i]) - ChaserR;

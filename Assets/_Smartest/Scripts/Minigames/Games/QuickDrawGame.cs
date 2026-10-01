@@ -29,6 +29,8 @@ namespace Smartest.Minigames
         private float _window;
         private float _r;
         private float _reactionSum;
+        private int _golds;
+        private int _hits;
         private RectTransform _target;
         private Image _targetImage;
         private TMP_Text _label;
@@ -77,6 +79,8 @@ namespace Smartest.Minigames
             _appearAt = _draws[0].Delay;
             _label = UiKit.Label(Area, "Hint", "WAIT FOR IT", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            _golds = golds;
+            Progress("HIT", 0, _golds);
         }
 
         private void Next()
@@ -119,6 +123,7 @@ namespace Smartest.Minigames
             if (Vector2.Distance(click, d.Pos) > _r + 8f) return; // a miss: fire again
 
             _reactionSum += Elapsed - _shownAt;
+            Progress("HIT", ++_hits, _golds);
             Next();
             if (_index >= _draws.Length)
             {

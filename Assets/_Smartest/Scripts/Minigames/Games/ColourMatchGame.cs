@@ -74,6 +74,7 @@ namespace Smartest.Minigames
             _showAt = 0.5f;
             _label = UiKit.Label(Area, "Hint", "MATCH THE COLOUR", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            Progress("MATCHED", 0, n);
         }
 
         private void Next()
@@ -81,6 +82,7 @@ namespace Smartest.Minigames
             _showing = false;
             _swatch.color = Palette.PanelRaised;
             _index++;
+            Progress("MATCHED", _index, _prompts.Length);
             _showAt = Elapsed + Gap;
         }
 

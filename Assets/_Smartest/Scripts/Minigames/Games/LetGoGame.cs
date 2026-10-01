@@ -66,6 +66,7 @@ namespace Smartest.Minigames
             _word = UiKit.Label(_light.transform, "Word", "HOLD", 60f, Palette.Ink, new Vector2(220f, 110f), Vector2.zero);
             _label = UiKit.Label(Area, "Hint", "PRESS AND HOLD", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            Progress("ROUNDS", 0, rounds);
         }
 
         private void Show(Color fill, string word, Color ink)
@@ -121,6 +122,7 @@ namespace Smartest.Minigames
                 _label.text = Mathf.RoundToInt((Elapsed - _redAt) * 1000f) + " MS";
                 _label.color = Palette.Green;
                 _round++;
+                Progress("ROUNDS", _round, _waits.Length);
                 _doneAt = Elapsed;
                 Show(Palette.Neutral, "", Palette.Ink);
                 if (_round >= _waits.Length && CanAct) Finish(false, Ms(_reactionSum));

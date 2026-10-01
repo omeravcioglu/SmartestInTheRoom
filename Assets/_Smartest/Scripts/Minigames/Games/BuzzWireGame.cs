@@ -140,6 +140,8 @@ namespace Smartest.Minigames
                 return;
             }
             _last = p;
+            // The path only ever runs left to right, so how far along it is how far across.
+            Progress("ALONG", Mathf.InverseLerp(_start.center.x, _end.center.x, p.x));
 
             if (_end.Contains(p))
             {

@@ -97,6 +97,7 @@ namespace Smartest.Minigames
                 }
                 _shown = due;
                 _answered = false;
+                Progress("CARDS", _shown + 1, _values.Length);
                 var ink = Inks[_colours[_shown]];
                 _cardImage.color = ink;
                 _number.text = _values[_shown].ToString();

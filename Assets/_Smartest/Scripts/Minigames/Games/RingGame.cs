@@ -106,6 +106,7 @@ namespace Smartest.Minigames
             }
 
             if (off > _half) { Fail(Vector2.Distance(local, c) < r ? "FELL INSIDE" : "SLIPPED OUT"); return; }
+            Progress("STAY IN", t / _hold);
             _distSum += off * dt;
             _timeSum += dt;
             if (t >= _hold)

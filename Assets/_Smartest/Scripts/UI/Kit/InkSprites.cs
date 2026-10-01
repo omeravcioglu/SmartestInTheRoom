@@ -130,7 +130,7 @@ namespace Smartest.UI
         {
             (36f, 2.5f, false), (36f, 2.5f, true), (38f, 2.5f, true), (40f, 2.5f, true), (46f, 2.5f, true),
             (60f, 3f, true), (64f, 3f, true), (64f, 3f, false), (84f, 3f, true), (320f, 5f, true), (30f, 4f, false),
-            (46f, 3f, false)
+            (46f, 3f, false), (18f, 2.5f, false)
         };
 
         public static string BoxName(float border, float radius) => $"box_b{Tenths(border)}_r{Mathf.RoundToInt(radius)}";

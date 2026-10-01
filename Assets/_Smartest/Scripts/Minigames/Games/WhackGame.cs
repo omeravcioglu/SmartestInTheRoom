@@ -29,6 +29,8 @@ namespace Smartest.Minigames
         private float[] _flashUntil = new float[N * N];
         private float _upFor;
         private float _reactionSum;
+        private int _golds;
+        private int _whacked;
         private TMP_Text _label;
 
         protected override void Build()
@@ -66,7 +68,9 @@ namespace Smartest.Minigames
                 do hole = RandomRange(0, N * N); while (busyUntil[hole] > up && ++tries < 20);
                 busyUntil[hole] = up + _upFor + 0.2f;
                 _moles[i] = new Mole { Hole = hole, Up = up, Red = i > 0 && RandomRange(0f, 1f) < redShare };
+                if (!_moles[i].Red) _golds++;
             }
+            Progress("WHACKED", 0, _golds);
 
             _label = UiKit.Label(Area, "Hint", "WHACK THE GOLD", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
@@ -122,6 +126,7 @@ namespace Smartest.Minigames
             if (_moles[i].Red) { Fail("THAT WAS A BOMB", hole); return; }
             _moles[i].Hit = true;
             _moles[i].Done = true;
+            Progress("WHACKED", ++_whacked, _golds);
             _reactionSum += Elapsed - _moles[i].Up;
             _flashUntil[hole] = Elapsed + HitFlash;
             _holes[hole].color = Palette.Green;
