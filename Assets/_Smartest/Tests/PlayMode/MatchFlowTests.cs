@@ -57,6 +57,9 @@ namespace Smartest.Tests
             var first = GameState.Instance;
             Assert.AreEqual(1, first.RoundIndex.Value, "a new match starts at round one");
             Assert.AreEqual(GamePhase.RoundIntro, first.Phase.Value);
+            if (!GameBootstrap.ConfigOrDefault.questionRounds)
+                Assert.IsTrue(first.CurrentDef != null && first.CurrentDef.IsMinigame,
+                    "question rounds are off, so round one has to be a minigame");
 
             net.ReturnToLobby();
             yield return WaitFor(() => SceneManager.GetActiveScene().name == NetSession.MenuSceneName

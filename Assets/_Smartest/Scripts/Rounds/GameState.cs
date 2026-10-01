@@ -208,8 +208,10 @@ namespace Smartest.Rounds
                 return;
             }
             _rng = new System.Random(Environment.TickCount);
-            // Only questions that work with this many players (nobody can join mid-match).
-            _deck = new ChallengeDeck(library.SocialIds(PlayerData.All.Count), library.MinigameIds(),
+            // Only questions that work with this many players (nobody can join mid-match), and
+            // none at all while question rounds are switched off: then a match is all minigames.
+            var questions = Config.questionRounds ? library.SocialIds(PlayerData.All.Count) : new List<int>();
+            _deck = new ChallengeDeck(questions, library.MinigameIds(),
                 id => library.GetById(id)?.inputType, Environment.TickCount,
                 Config.alternateSocialAndMinigame, minigamesPerQuestion: Config.minigamesPerQuestion);
             _current = null;

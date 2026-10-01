@@ -43,10 +43,14 @@ namespace Smartest.Core
         [Header("Match rules")]
         public int targetScore = 100;
         public int maxPlayers = 8;
-        [Tooltip("Alternate social rounds and minigames. Off = one shuffled pool of everything.")]
+        [Tooltip("Deal question rounds (Red/Green, Yes/No, numbers) between minigames. Off: a match " +
+                 "is minigames only. Playtesters found the questions not fun, so they're off; the rounds " +
+                 "and their assets are all still there if this is ever switched back on.")]
+        public bool questionRounds = false;
+        [Tooltip("With question rounds on: alternate them with minigames. Off = one shuffled pool of everything.")]
         public bool alternateSocialAndMinigame = true;
-        [Tooltip("With alternation on: how many minigames come between two questions. " +
-                 "1 = strictly one of each. Questions are the reading-heavy part, so fewer keeps the pace up.")]
+        [Tooltip("With question rounds and alternation on: how many minigames come between two questions. " +
+                 "1 = strictly one of each.")]
         [Range(1, 4)] public int minigamesPerQuestion = 2;
 
         [Header("Minigames")]

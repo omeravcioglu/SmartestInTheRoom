@@ -133,8 +133,10 @@ namespace Smartest.Tests
                         yield return Once(def != null && def.IsMinigame ? "20-rule-card" : $"10-intro-{kind}");
                         // Once every kind of answer has been on screen (or the deck has had its
                         // chance), hand ourselves the match.
-                        bool seenAll = _taken.Contains("14-scoring-redgreen") && _taken.Contains("14-scoring-yesno")
-                                       && _taken.Contains("14-scoring-number1to10");
+                        // With question rounds off there are no answers to wait for.
+                        bool seenAll = !GameBootstrap.ConfigOrDefault.questionRounds
+                                       || (_taken.Contains("14-scoring-redgreen") && _taken.Contains("14-scoring-yesno")
+                                           && _taken.Contains("14-scoring-number1to10"));
                         if (!cheated && (seenAll || gs.RoundIndex.Value >= 16) && gs.RoundIndex.Value >= 5
                             && PlayerData.Local != null)
                         {

@@ -202,6 +202,19 @@ namespace Smartest.Tests
         }
 
         [Test]
+        public void WithQuestionRoundsOffAMatchIsAllMinigames()
+        {
+            // What GameState builds when GameConfig.questionRounds is off: no questions at all.
+            var deck = new ChallengeDeck(new List<int>(), MinigameIds(), InputOf, seed: 9, alternate: true, minigamesPerQuestion: 2);
+            for (int i = 0; i < 60; i++)
+            {
+                // Even a forced red/green follow-up (there can't be one) must not conjure a question.
+                int id = i % 7 == 0 ? deck.Draw(InputType.RedGreen) : deck.Draw();
+                Assert.IsTrue(IsMinigame(id), $"draw {i} dealt a question");
+            }
+        }
+
+        [Test]
         public void Challenges_SurviveAnEmptyMinigameRegistry()
         {
             var deck = new ChallengeDeck(AllIds(), new List<int>(), InputOf, seed: 8, alternate: true);

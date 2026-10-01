@@ -355,10 +355,22 @@ namespace Smartest.UI
                 84f, Palette.Ink, TextAlignmentOptions.TopLeft, caps: true, lineHeight: 0.9f);
             pitch.rectTransform.At(48f, 338f, 1060f, 160f);
             pitch.Fit(44f);
-            KindBox(root, "Social", 48f, 532f, "Social rounds", $"{socialRounds} OF THEM",
-                "Everyone answers at once. What you score depends on what the room picked.", false);
-            KindBox(root, "Minigames", 48f + 516f + 28f, 532f, "Minigames", $"{minigames} OF THEM",
-                "Same level for everyone. Fail and you're out. Last one standing wins.", true);
+            // The two boxes say what a match is made of. Baked in by Build Scenes, so flipping
+            // questionRounds in the config wants a rebuild to match.
+            if (config != null && config.questionRounds)
+            {
+                KindBox(root, "Social", 48f, 532f, "Social rounds", $"{socialRounds} OF THEM",
+                    "Everyone answers at once. What you score depends on what the room picked.", false);
+                KindBox(root, "Minigames", 48f + 516f + 28f, 532f, "Minigames", $"{minigames} OF THEM",
+                    "Same level for everyone. Fail and you're out. Last one standing wins.", true);
+            }
+            else
+            {
+                KindBox(root, "Minigames", 48f, 532f, "Minigames", $"{minigames} OF THEM",
+                    "Reflexes, memory, aim and nerve. A new game every round, explained in one line.", true);
+                KindBox(root, "Knockout", 48f + 516f + 28f, 532f, "Knockout", "EVERY LEVEL",
+                    "Same level for everyone. Fail, or come last, and you're out. Last one standing wins.", false);
+            }
             var discord = Ink.Text(root, "Discord", "No in-game chat. Talk on Discord.", TypeRole.Body, 24f, Palette.Ink,
                 TextAlignmentOptions.TopLeft);
             discord.fontStyle |= FontStyles.Italic | FontStyles.Bold;
