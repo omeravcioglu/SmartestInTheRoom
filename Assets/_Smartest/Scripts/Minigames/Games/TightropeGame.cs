@@ -33,6 +33,7 @@ namespace Smartest.Minigames
         private readonly List<int> _gustDir = new List<int>();
         private float _f1, _f2, _p1, _p2;
         private float _theta, _omega, _shift;
+        private bool _steadying; // the demo: partway through a correction
         private float _simTime, _acc, _leanSum;
         private float _ropeY, _halfW;
         private RectTransform _walker, _pole, _armL, _armR, _startPost, _endPost;
@@ -145,10 +146,23 @@ namespace Smartest.Minigames
             return Mathf.Clamp(want, -1f, 1f) * Reach;
         }
 
+        /// <summary>
+        /// The rule card's demo balances the way a player does: it lets the walker tip a little,
+        /// slides the pole firmly against the lean until they're upright, then lets it back to the
+        /// middle. The watcher's hand above never lets them lean enough to see what the pole is for.
+        /// </summary>
+        private float DemoPole()
+        {
+            if (Mathf.Abs(_theta) > 3f * Mathf.Deg2Rad) _steadying = true;
+            else if (Mathf.Abs(_theta) < 1f * Mathf.Deg2Rad && Mathf.Abs(_omega) < 0.06f) _steadying = false;
+            return _steadying ? Mathf.Clamp(-(4f * _theta + 1.5f * _omega), -1f, 1f) * Reach : 0f;
+        }
+
         protected override void OnTick(float dt)
         {
             float target;
             if (CanAct && UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var m)) target = Mathf.Clamp(m.x, -Reach, Reach);
+            else if (Demo) target = DemoPole();
             else if (!Interactive) target = AutoPole();
             else target = _shift;
 
@@ -171,8 +185,10 @@ namespace Smartest.Minigames
                 break;
             }
             Draw();
+            // The rule card's demo: only the mouse's x moves the pole, so the hand slides with it, over the walker's head.
+            if (Demo) PointAt(new Vector2(_shift, _ropeY + 230f));
 
-            if (!CanAct) return;
+            if (!CanMove) return;
             if (fell)
             {
                 _walker.localRotation = Quaternion.Euler(0f, 0f, -Mathf.Sign(_theta) * 80f);

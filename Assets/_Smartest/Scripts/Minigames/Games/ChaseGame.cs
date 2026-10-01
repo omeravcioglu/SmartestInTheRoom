@@ -35,6 +35,7 @@ namespace Smartest.Minigames
         private float _startAt = -1f;
         private float _distSum;
         private float _timeSum;
+        private Vector2 _demoAt; // the demo's mouse
 
         protected override void Build()
         {
@@ -60,11 +61,14 @@ namespace Smartest.Minigames
             _freq = new Vector2(RandomRange(f, f * 1.5f), RandomRange(f, f * 1.5f));
             _sign = new Vector2(RandomRange(0, 2) == 0 ? -1f : 1f, RandomRange(0, 2) == 0 ? -1f : 1f);
 
-            // Pale until you're on it; someone watching just sees the ball.
-            _ballImage = UiKit.Dot(Area, "Ball", _radius * 2f, Vector2.zero, Interactive ? Palette.AccentDim : Palette.Accent);
+            // Pale until you're on it (the demo gets on it as a player does); someone watching
+            // just sees the ball.
+            _ballImage = UiKit.Dot(Area, "Ball", _radius * 2f, Vector2.zero, Interactive || Demo ? Palette.AccentDim : Palette.Accent);
             _ball = (RectTransform)_ballImage.transform;
             _label = UiKit.Label(Area, "Hint", "GET ON THE BALL", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            // The demo's hand starts off the ball, low on the left.
+            _demoAt = new Vector2(-260f, -150f);
         }
 
         /// <summary>Where the ball is, `moving` seconds after it set off: a Lissajous path from the centre, eased in.</summary>
@@ -77,17 +81,20 @@ namespace Smartest.Minigames
 
         protected override void OnTick(float dt)
         {
-            if (!Interactive && _startAt < 0f) _startAt = WatchStart;
+            // The demo waits for its own cursor to get on, like a player.
+            if (!Interactive && !Demo && _startAt < 0f) _startAt = WatchStart;
             float moving = _startAt < 0f ? 0f : Mathf.Max(0f, Elapsed - _startAt);
             var c = BallAt(moving);
             if (_ball != null) _ball.anchoredPosition = c;
 
-            if (!CanAct)
+            Vector2 local;
+            if (Demo) local = DemoMouse(c, dt);
+            else if (!CanAct)
             {
                 if (_startAt >= 0f && moving >= _hold) Finish(false, 0);
                 return;
             }
-            if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var local)) return;
+            else if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out local)) return;
             float d = Vector2.Distance(local, c);
 
             if (!_on)
@@ -119,6 +126,15 @@ namespace Smartest.Minigames
                 // Tenths of a pixel: whole pixels would tie, and a tie means a play-off.
                 Finish(false, Mathf.RoundToInt(avg * 10f));
             }
+        }
+
+        /// <summary>The rule card's demo plays it as a player: a beat, onto the ball, then after it, never quite dead centre.</summary>
+        private Vector2 DemoMouse(Vector2 c, float dt)
+        {
+            var aim = c + new Vector2(10f * Mathf.Sin(Elapsed * 1.3f), 8f * Mathf.Sin(Elapsed * 1.9f + 0.5f));
+            if (Elapsed >= 0.3f) _demoAt = Vector2.MoveTowards(_demoAt, aim, 550f * dt);
+            PointAt(_demoAt);
+            return _demoAt;
         }
 
         private void Fail(string why)

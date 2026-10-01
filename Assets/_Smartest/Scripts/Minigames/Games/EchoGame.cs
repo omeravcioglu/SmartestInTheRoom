@@ -10,7 +10,8 @@ namespace Smartest.Minigames
     /// The original Simon: four coloured pads, a sequence of flashes, and you play it back.
     /// Where Simon asks you to remember places on a grid, this one is a string of colours, and
     /// it gets long. The pads are plain boxes rather than kit cells, so red and green here are
-    /// just colours, not right and wrong. Ranked by how fast you play it back.
+    /// just colours, not right and wrong; each carries its own mark (star, diamond, dot,
+    /// square) so the sequence can be followed by shape too. Ranked by how fast you play it back.
     /// </summary>
     public class EchoGame : MinigameView
     {
@@ -46,6 +47,7 @@ namespace Smartest.Minigames
             }
 
             _lit = new[] { Palette.Gold, Palette.Red, Palette.Green, Palette.Blue };
+            var marks = new[] { UiKit.Mark.Star, UiKit.Mark.Diamond, UiKit.Mark.Dot, UiKit.Mark.Square };
             var padSize = new Vector2(190f, 150f);
             float gap = 18f;
             for (int i = 0; i < 4; i++)
@@ -54,6 +56,7 @@ namespace Smartest.Minigames
                 var pos = new Vector2((i % 2 == 0 ? -1f : 1f) * (padSize.x + gap) * 0.5f,
                                       20f + (i < 2 ? 1f : -1f) * (padSize.y + gap) * 0.5f);
                 _pads[i] = UiKit.Box(Area, "Pad" + i, padSize, pos, _dim[i]);
+                UiKit.Marker(_pads[i].transform, "Mark", marks[i], 46f, Vector2.zero, Palette.Ink);
                 _padRects[i] = new Rect(pos - padSize * 0.5f, padSize);
             }
 
@@ -84,14 +87,33 @@ namespace Smartest.Minigames
 
             if (_flashPad >= 0 && Elapsed >= _flashUntil) { _pads[_flashPad].color = _dim[_flashPad]; _flashPad = -1; }
 
+            // The rule card's demo plays it back like a sure player, a pad a beat.
+            if (Demo)
+            {
+                if (IsDone || Elapsed - _showEnd < 0.3f) return;
+                int next = _sequence[_index];
+                PointAt(Where(_pads[next]));
+                if (Elapsed - _showEnd >= 0.65f + _index * 0.55f)
+                {
+                    TapAt(Where(_pads[next]));
+                    Press(next);
+                }
+                return;
+            }
+
             if (!CanAct) return;
             if (Elapsed - _showEnd > AnswerFor) { Fail("TOO SLOW"); return; }
             if (!KeyInput.MousePressed() || !UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var click)) return;
 
             int pad = -1;
             for (int i = 0; i < 4; i++) if (_padRects[i].Contains(click)) pad = i;
-            if (pad < 0) return;
+            if (pad >= 0) Press(pad);
+        }
 
+        /// <summary>A pad clicked: by the player, or by the rule card's demo.</summary>
+        private void Press(int pad)
+        {
+            if (!CanMove) return;
             if (_flashPad >= 0) _pads[_flashPad].color = _dim[_flashPad];
             _pads[pad].color = _lit[pad];
             _flashPad = pad;

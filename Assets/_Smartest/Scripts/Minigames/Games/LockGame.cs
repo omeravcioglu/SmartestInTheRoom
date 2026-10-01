@@ -100,6 +100,9 @@ namespace Smartest.Minigames
 
         private void DrawNeedle() => UiKit.SetLine(_needle, OnRing(_angle, R - Ring * 0.5f - 6f), OnRing(_angle, R + Ring * 0.5f + 6f));
 
+        /// <summary>The outside edge of the notch's middle: where the rule card's demo clicks, on the gold.</summary>
+        private Vector2 NotchEdge => OnRing(_notch, R + Ring * 0.5f + 4f);
+
         protected override void OnTick(float dt)
         {
             if (_hits >= _offsets.Count) return;
@@ -109,12 +112,17 @@ namespace Smartest.Minigames
             DrawNeedle();
 
             bool click;
-            if (!Interactive) click = _toGo <= 0.8f; // someone watching sees a sure hand
+            if (!Interactive)
+            {
+                click = _toGo <= 0.8f; // someone watching sees a sure hand
+                if (Demo) PointAt(NotchEdge); // the demo's hand waits on the gold for the needle
+            }
             else if (!CanAct) return;
             else click = KeyInput.MousePressed() || KeyInput.SpacePressed();
 
             if (click)
             {
+                if (Demo) TapAt(NotchEdge);
                 if (Mathf.Abs(_toGo) > _half) { Fail(_toGo > 0f ? "TOO EARLY" : "TOO LATE"); return; }
                 _errorSum += Mathf.Abs(_toGo);
                 _hits++;
@@ -124,7 +132,7 @@ namespace Smartest.Minigames
                 {
                     foreach (var piece in _arc) piece.gameObject.SetActive(false);
                     _shackle.anchoredPosition += new Vector2(0f, 24f); // pop
-                    if (!CanAct) return;
+                    if (!CanMove) return;
                     _label.text = "UNLOCKED";
                     _label.color = Palette.Green;
                     // Hundredths of a degree off the middle, summed.

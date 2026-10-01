@@ -29,6 +29,7 @@ namespace Smartest.Minigames
         private float _ceiling;
         private float _halfW;
         private float _acc;
+        private float _spin;
         private float _lowest = float.MaxValue;
 
         /// <summary>Bigger clearance is better, so the worst result is none at all.</summary>
@@ -66,7 +67,7 @@ namespace Smartest.Minigames
             // rather than the instant the ball appears.
             _p = new Vector2(RandomRange(-_halfW * 0.4f, _halfW * 0.4f), 60f);
             _v = new Vector2(0f, Mathf.Sqrt(2f * _g * 90f));
-            _ballImage = UiKit.Dot(Area, "Ball", _r * 2f, _p, Palette.Accent);
+            _ballImage = UiKit.Art(Area, "Ball", "ball", new Vector2(_r * 2f, _r * 2f), _p, Palette.Accent);
             _ball = (RectTransform)_ballImage.transform;
             _label = UiKit.Label(Area, "Hint", "CLICK THE BALL", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
@@ -74,15 +75,8 @@ namespace Smartest.Minigames
 
         protected override void OnTick(float dt)
         {
-            if (CanAct && KeyInput.MousePressed() && UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var m))
-            {
-                var off = _p - m;
-                if (off.magnitude <= _r + HitSlack)
-                {
-                    _v.y = _bounce;
-                    _v.x = Mathf.Clamp(_v.x + off.x / _r * 260f, -420f, 420f);
-                }
-            }
+            if (CanAct && KeyInput.MousePressed() && UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var m)) Kick(m);
+            if (Demo) PlayDemo();
 
             bool dropped = false;
             _acc += dt;
@@ -107,9 +101,15 @@ namespace Smartest.Minigames
                 }
                 if (gap < _lowest) _lowest = gap;
             }
-            if (_ball != null) _ball.anchoredPosition = _p;
+            if (_ball != null)
+            {
+                _ball.anchoredPosition = _p;
+                // It rolls the way it's going.
+                _spin -= _v.x * dt / _r * Mathf.Rad2Deg;
+                _ball.localRotation = Quaternion.Euler(0f, 0f, _spin);
+            }
 
-            if (!CanAct) return;
+            if (!CanMove) return;
             if (dropped)
             {
                 _ballImage.color = Palette.Red;
@@ -125,6 +125,36 @@ namespace Smartest.Minigames
                 // Tenths of a pixel: whole pixels would tie, and a tie means a play-off.
                 Finish(false, Mathf.RoundToInt(Mathf.Max(0f, lowest) * 10f));
             }
+        }
+
+        /// <summary>
+        /// The rule card's demo: the hand waits under the ball, low down where it'll meet it, and
+        /// clicks it on its way down, low on the ball and just off-centre so it drifts back
+        /// towards the middle.
+        /// </summary>
+        private void PlayDemo()
+        {
+            // Off-centre by enough to turn its sideways speed into a gentle drift home.
+            float home = Mathf.Clamp(-_p.x * 0.5f, -120f, 120f);
+            float side = Mathf.Clamp((home - _v.x) * _r / 260f, -_r * 0.45f, _r * 0.45f);
+            var at = _p + new Vector2(-side, -_r * 0.35f);
+            if (_v.y < 0f && _p.y - _r - _floorLine < 80f)
+            {
+                TapAt(at);
+                Kick(at);
+                return;
+            }
+            PointAt(new Vector2(at.x, Mathf.Min(at.y, _floorLine + _r * 0.65f + 70f)));
+        }
+
+        /// <summary>A click, the player's or the demo's: on the ball, it jumps (off-centre, it heads the other way).</summary>
+        private void Kick(Vector2 at)
+        {
+            if (!CanMove) return;
+            var off = _p - at;
+            if (off.magnitude > _r + HitSlack) return;
+            _v.y = _bounce;
+            _v.x = Mathf.Clamp(_v.x + off.x / _r * 260f, -420f, 420f);
         }
 
         private void Fail(string why)

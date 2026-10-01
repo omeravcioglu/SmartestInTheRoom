@@ -93,7 +93,12 @@ namespace Smartest.Minigames
                 _label.color = Palette.TextDim;
             }
 
-            bool held = CanAct ? KeyInput.MouseHeld() : !Interactive;
+            // Someone watching sees the button held from the start of each round. The rule card's
+            // demo presses a beat after the round starts, and lets go a beat after red, as below.
+            bool held = CanAct ? KeyInput.MouseHeld()
+                : Demo ? Elapsed - _roundStart >= 0.4f && (_redAt < 0f || Elapsed - _redAt < 0.3f)
+                : !Interactive;
+            if (Demo) HoldAt(new Vector2(220f, -20f), held);
 
             if (_heldAt < 0f)
             {
@@ -125,7 +130,7 @@ namespace Smartest.Minigames
                 Progress("ROUNDS", _round, _waits.Length);
                 _doneAt = Elapsed;
                 Show(Palette.Neutral, "", Palette.Ink);
-                if (_round >= _waits.Length && CanAct) Finish(false, Ms(_reactionSum));
+                if (_round >= _waits.Length && CanMove) Finish(false, Ms(_reactionSum));
             }
             else if (CanAct && Elapsed - _redAt > ReleaseBy) Fail("TOO SLOW");
         }

@@ -70,11 +70,22 @@ namespace Smartest.Minigames
                 if (_label != null) { _label.text = "WHICH MOVED?"; _label.color = Palette.Text; }
             }
             else if (_stage == 2 && Elapsed - _lookFor - _blink > 8f) Fail("TOO SLOW");
+
+            // The rule card's demo looks the new pattern over, then clicks where the box landed.
+            if (Demo && _stage == 2 && !IsDone && Elapsed - _lookFor - _blink >= 0.5f)
+            {
+                PointAt(Where(_cells[_answer]));
+                if (Elapsed - _lookFor - _blink >= 0.85f)
+                {
+                    TapAt(Where(_cells[_answer]));
+                    OnCell(_answer);
+                }
+            }
         }
 
         private void OnCell(int index)
         {
-            if (!CanAct || _stage != 2) return;
+            if (!CanMove || _stage != 2) return;
             if (index != _answer)
             {
                 _cells[index].color = Palette.Red;

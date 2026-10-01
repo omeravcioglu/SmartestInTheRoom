@@ -332,15 +332,9 @@ namespace Smartest.UI
             var panel = root.gameObject.AddComponent<Panel>();
             panel.ApplyConfig(config);
             panel.SetMotion(1f, Vector2.zero);
-            int max = config != null ? config.maxPlayers : 8;
             int target = config != null ? config.targetScore : 100;
 
-            // Top strip and nameplate.
-            var strip = Ink.Label(root, "Strip", $"1–{max} PLAYERS · ONLINE, WI-FI OR SAME PC", 14f,
-                null, TextAlignmentOptions.MidlineLeft);
-            strip.rectTransform.At(48f, 18f, 700f, 56f);
-            var first = Ink.Label(root, "FirstTo", $"FIRST TO {target} WINS", 14f, null, TextAlignmentOptions.Midline);
-            first.rectTransform.At(660f, 18f, 600f, 56f);
+            // The sound button over the masthead's rule, then the nameplate.
             SoundButton.Create(root, settings, 1872f - 52f, 20f, 52f);
             Ink.Plain(root, "Rule0", Palette.Ink).rectTransform.At(48f, 82f, 1824f, 2f);
 
@@ -371,10 +365,6 @@ namespace Smartest.UI
                 KindBox(root, "Knockout", 48f + 516f + 28f, 532f, "Knockout", "EVERY LEVEL",
                     "Same level for everyone. Fail, or come last, and you're out. Last one standing wins.", false);
             }
-            var discord = Ink.Text(root, "Discord", "No in-game chat. Talk on Discord.", TypeRole.Body, 24f, Palette.Ink,
-                TextAlignmentOptions.TopLeft);
-            discord.fontStyle |= FontStyles.Italic | FontStyles.Bold;
-            discord.rectTransform.At(48f, 744f, 1060f, 36f);
 
             // Right: the play card.
             var card = Ink.Box(root, "Play", Palette.PaperHi, 4f);
@@ -450,13 +440,13 @@ namespace Smartest.UI
             var space = Ink.Node(root, "Frame");
             space.Fill(2000f, 2000f, 2000f, 2000f);
             var card = Ink.Box(space, "Card", Palette.PaperHi, 4f, 0f, raycast: true);
-            card.rectTransform.At(600f, 200f, 720f, 660f);
+            card.rectTransform.At(600f, 270f, 720f, 540f);
             Ink.Shadow(card, 14f, Palette.Gold);
             var c = card.transform;
 
             var kick = Ink.Kicker(c, "Title", "Join a game", 44f);
             Ink.BoxOf(kick).Pin(48f, 40f, new Vector2(0f, 1f));
-            Ink.Label(c, "CodeLabel", "CODE OR IP", 15f).rectTransform.At(48f, 136f, 400f, 20f);
+            Ink.Label(c, "CodeLabel", "JOIN CODE", 15f).rectTransform.At(48f, 136f, 400f, 20f);
             menu.codeField = Field(c, "CodeField", 48f, 172f, 616f, 118f, TypeRole.Mono, 70f, true, "CODE");
 
             menu.joinGoButton = Ink.Slab(c, "JoinGoButton", "Go", Palette.Gold, Palette.Ink, 76f, 4f, 8f);
@@ -464,13 +454,8 @@ namespace Smartest.UI
             menu.joinBackButton = Ink.Slab(c, "JoinBackButton", "Back", Palette.PaperHi, Palette.Ink, 52f, 4f, 8f);
             menu.joinBackButton.GetComponent<RectTransform>().At(48f + 394f + 22f, 316f, 200f, 104f);
 
-            var hint = Ink.Text(c, "JoinHint",
-                "The host's code, or their IP on the same Wi-Fi.\nType LOCAL for a second instance on this PC.",
-                TypeRole.Body, 21f, Palette.Ink2, TextAlignmentOptions.TopLeft, lineHeight: 1.5f);
-            hint.rectTransform.At(48f, 448f, 624f, 70f);
-
             menu.joinStatus = Ink.Stamp(c, "Status", "JOINING…", 22f, -3f, 3f);
-            Ink.BoxOf(menu.joinStatus).Pin(48f, 560f, new Vector2(0f, 0.5f));
+            Ink.BoxOf(menu.joinStatus).Pin(48f, 474f, new Vector2(0f, 0.5f));
             Ink.BoxOf(menu.joinStatus).gameObject.SetActive(false);
             return panel;
         }

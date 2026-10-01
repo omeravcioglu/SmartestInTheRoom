@@ -32,6 +32,7 @@ namespace Smartest.Minigames
         private float _settledAt;
         private float _closest = float.MaxValue;
         private bool _inside;
+        private Vector2 _demoAt; // the demo's mouse
 
         /// <summary>Bigger margin is better, so the worst result is nothing at all.</summary>
         public override int WorstMetric => 0;
@@ -75,6 +76,9 @@ namespace Smartest.Minigames
             _circle = (RectTransform)_circleImage.transform;
             _label = UiKit.Label(Area, "Hint", "KEEP THE CURSOR INSIDE", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+
+            // The demo's hand starts outside, low on the right, and has the first second to get in.
+            _demoAt = new Vector2(260f, -150f);
         }
 
         private Vector2 CentreNow()
@@ -104,13 +108,14 @@ namespace Smartest.Minigames
                 _circle.sizeDelta = new Vector2(_radius * 2f, _radius * 2f);
             }
 
-            if (!CanAct)
+            Vector2 local;
+            if (Demo) local = DemoMouse(c, dt);
+            else if (!CanAct)
             {
                 if (Elapsed >= _hold) Finish(false, 0);
                 return;
             }
-
-            if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var local)) return;
+            else if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out local)) return;
             float margin = _radius - Vector2.Distance(local, c);
 
             // Grace periods: the first second (the cursor may be anywhere when GO lands) and
@@ -135,6 +140,18 @@ namespace Smartest.Minigames
                 // Tenths of a pixel: whole pixels tie far too often, and a tie means a play-off.
                 Finish(false, Mathf.RoundToInt(Mathf.Max(0f, closest) * 10f));
             }
+        }
+
+        /// <summary>
+        /// The rule card's demo plays it as a player: a beat, into the circle (after it, if it
+        /// moves), then as still as a real hand manages, which is a few pixels of tremor.
+        /// </summary>
+        private Vector2 DemoMouse(Vector2 c, float dt)
+        {
+            var rest = c + new Vector2(12f + 3f * Mathf.Sin(Elapsed * 2.3f), -8f + 3f * Mathf.Sin(Elapsed * 1.7f + 1f));
+            if (Elapsed >= 0.3f) _demoAt = Vector2.MoveTowards(_demoAt, rest, 500f * dt);
+            PointAt(_demoAt);
+            return _demoAt;
         }
 
         private void Fail(string why)

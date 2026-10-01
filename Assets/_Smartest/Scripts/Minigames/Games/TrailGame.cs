@@ -99,6 +99,24 @@ namespace Smartest.Minigames
                 Progress("DRAWN", 0, _path.Count);
             }
 
+            if (Demo)
+            {
+                // The rule card's demo presses on the first cell and sweeps the path back with the
+                // button held, through the same hit test as the mouse, a cell a beat.
+                float u = Elapsed - _showEnd - 0.45f;
+                if (u < -0.3f) return;
+                if (u < 0f) { PointAt(Where(_cells[_path[0]])); return; }
+                int k = Mathf.Min(_path.Count - 1, Mathf.FloorToInt(u / 0.4f));
+                var from = Where(_cells[_path[k]]);
+                var to = Where(_cells[_path[Mathf.Min(k + 1, _path.Count - 1)]]);
+                var at = Vector2.Lerp(from, to, Mathf.SmoothStep(0f, 1f, u / 0.4f - k));
+                HoldAt(at, true);
+                // A long frame can carry the hand past a whole cell; it went through it all the same.
+                for (int i = _index; i <= k && !IsDone; i++) Enter(_path[i]);
+                Enter(CellAt(at));
+                if (IsDone) HoldAt(at, false);
+                return;
+            }
             if (!Interactive)
             {
                 // Someone watching sees it traced at a steady pace.
@@ -110,9 +128,13 @@ namespace Smartest.Minigames
             if (Elapsed - _showEnd > AnswerFor) { Fail("TOO SLOW", -1); return; }
             if (!KeyInput.MouseHeld() && !KeyInput.MousePressed()) { _last = -1; return; }
             if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var m)) return;
+            Enter(CellAt(m));
+        }
 
-            int cellHere = CellAt(m);
-            if (cellHere < 0 || cellHere == _last) return;
+        /// <summary>The held pointer is over this cell (-1 between cells): the player's mouse, or the demo's hand.</summary>
+        private void Enter(int cellHere)
+        {
+            if (!CanMove || cellHere < 0 || cellHere == _last) return;
             _last = cellHere;
             // Sweeping back over a cell already drawn is fine; it just doesn't count again.
             if (_index > 0 && _path.IndexOf(cellHere) >= 0 && _path.IndexOf(cellHere) < _index) return;

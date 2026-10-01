@@ -22,10 +22,12 @@ namespace Smartest.Minigames
         private Vector2[] _p = new Vector2[0];
         private Vector2[] _v = new Vector2[0];
         private bool[] _live = new bool[0];
+        private float[] _spin = new float[0];
         private float _r, _g, _bounce, _wind, _hold;
         private float _floorLine, _ceiling, _halfW;
         private float _acc;
         private float _lowest = float.MaxValue;
+        private float _battedAt = -9f; // the demo's last bat
         private TMP_Text _label;
 
         public override int WorstMetric => 0;
@@ -63,12 +65,13 @@ namespace Smartest.Minigames
             _p = new Vector2[balls];
             _v = new Vector2[balls];
             _live = new bool[balls];
+            _spin = new float[balls];
             float spread = _halfW * 0.8f / balls;
             for (int i = 0; i < balls; i++)
             {
                 // Spread across the arena, each tossed up from mid-height when it joins.
                 _p[i] = new Vector2((i - (balls - 1) * 0.5f) * spread * 2f + RandomRange(-30f, 30f), 40f);
-                _images[i] = UiKit.Dot(Area, "Ball" + i, _r * 2f, _p[i], Palette.Accent);
+                _images[i] = UiKit.Art(Area, "Ball" + i, "tball", new Vector2(_r * 2f, _r * 2f), _p[i], Palette.Accent);
                 _views[i] = (RectTransform)_images[i].transform;
                 _views[i].gameObject.SetActive(false);
             }
@@ -105,6 +108,7 @@ namespace Smartest.Minigames
                     _v[best].x = Mathf.Clamp(_v[best].x + off.x / _r * 240f, -380f, 380f);
                 }
             }
+            else if (Demo) DemoBat();
 
             int dropped = -1;
             _acc += dt;
@@ -154,9 +158,15 @@ namespace Smartest.Minigames
                     if (gap < _lowest) _lowest = gap;
                 }
             }
-            for (int i = 0; i < _p.Length; i++) if (_live[i]) _views[i].anchoredPosition = _p[i];
+            for (int i = 0; i < _p.Length; i++)
+            {
+                if (!_live[i]) continue;
+                _views[i].anchoredPosition = _p[i];
+                _spin[i] -= _v[i].x * dt / _r * Mathf.Rad2Deg; // rolling the way it's going
+                _views[i].localRotation = Quaternion.Euler(0f, 0f, _spin[i]);
+            }
 
-            if (!CanAct) return;
+            if (!CanMove) return;
             if (dropped >= 0)
             {
                 _images[dropped].color = Palette.Red;
@@ -172,6 +182,47 @@ namespace Smartest.Minigames
                 // Tenths of a pixel: whole pixels would tie, and a tie means a play-off.
                 Finish(false, Mathf.RoundToInt(Mathf.Max(0f, lowest) * 10f));
             }
+        }
+
+        /// <summary>
+        /// The rule card's demo: the hand waits where the next ball to land is coming down and
+        /// bats it a moment before it would, a touch off its middle so it drifts back to its own
+        /// side. Two coming down together: the first is taken early, to leave time for the other.
+        /// </summary>
+        private void DemoBat()
+        {
+            int next = -1;
+            float soonest = float.MaxValue, second = float.MaxValue;
+            for (int i = 0; i < _p.Length; i++)
+            {
+                if (!_live[i]) continue;
+                float land = Landing(i);
+                if (land < soonest) { second = soonest; soonest = land; next = i; }
+                else if (land < second) second = land;
+            }
+            if (next < 0) return;
+
+            float lead = Mathf.Clamp(0.55f - (second - soonest), 0.2f, 0.55f);
+            float wait = Mathf.Max(0f, soonest - lead);
+            var then = _p[next] + _v[next] * wait + 0.5f * _g * wait * wait * Vector2.down;
+            PointAt(new Vector2(Mathf.Clamp(then.x, -_halfW + _r, _halfW - _r), then.y));
+            if (soonest > lead || (Elapsed - _battedAt < 0.35f && soonest > 0.12f)) return;
+
+            // Batted as a click there would bat it.
+            float home = (next - (_p.Length - 1) * 0.5f) * _halfW * 1.6f / _p.Length;
+            float push = Mathf.Clamp((home - _p[next].x) * 0.8f, -200f, 200f) - _v[next].x;
+            var at = _p[next] - new Vector2(Mathf.Clamp(push / 240f * _r, -_r * 0.5f, _r * 0.5f), 0f);
+            TapAt(at);
+            _v[next].y = _bounce;
+            _v[next].x = Mathf.Clamp(_v[next].x + (_p[next].x - at.x) / _r * 240f, -380f, 380f);
+            _battedAt = Elapsed;
+        }
+
+        /// <summary>Seconds until a ball would touch the floor if nothing hit it.</summary>
+        private float Landing(int i)
+        {
+            float h = Mathf.Max(0f, _p[i].y - _r - _floorLine);
+            return (_v[i].y + Mathf.Sqrt(_v[i].y * _v[i].y + 2f * _g * h)) / _g;
         }
 
         private void Fail(string why)

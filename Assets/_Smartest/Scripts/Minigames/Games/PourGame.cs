@@ -20,6 +20,8 @@ namespace Smartest.Minigames
 
         private RectTransform _drink;
         private Image _drinkImage;
+        private RectTransform _stream;
+        private float _mouthY;
         private TMP_Text _label;
         private float _glassBottom;
         private float _inner;       // inside height of the glass
@@ -66,6 +68,16 @@ namespace Smartest.Minigames
             _drink = (RectTransform)_drinkImage.transform;
             _drink.pivot = new Vector2(0.5f, 0f);
             _drink.anchoredPosition = new Vector2(0f, _glassBottom);
+            // The tap over the glass, and the stream that runs from it while you pour.
+            float glassTop = centre.y + GlassH * 0.5f;
+            _mouthY = glassTop + 4f;
+            _stream = (RectTransform)UiKit.Box(Area, "Stream", new Vector2(14f, 0f), new Vector2(0f, _mouthY), Palette.Accent).transform;
+            _stream.pivot = new Vector2(0.5f, 1f);
+            _stream.anchoredPosition = new Vector2(0f, _mouthY);
+            _stream.gameObject.SetActive(false);
+            UiKit.Fill(Area, "Shine", new Vector2(10f, GlassH - 60f), new Vector2(-GlassW * 0.5f + 22f, centre.y), new Color(1f, 1f, 1f, 0.5f));
+            // Scaled to 3/4: the spout's mouth (4 px off the bottom, 15 right of centre) over the glass.
+            UiKit.Art(Area, "Tap", "tap", new Vector2(130f, 64f) * 0.75f, new Vector2(-15f * 0.75f, _mouthY + (32f - 4f) * 0.75f));
             // The line runs past both sides of the glass so it reads at a glance.
             UiKit.Fill(Area, "Line", new Vector2(GlassW + 60f, 6f), new Vector2(0f, _glassBottom + _line), Palette.Ink);
 
@@ -77,15 +89,21 @@ namespace Smartest.Minigames
 
         protected override void OnTick(float dt)
         {
-            if (!Interactive)
+            if (!Interactive && !Demo)
             {
                 // Someone watching sees a tidy pour to the line.
-                if (Elapsed > 1f && _level < _line) _level = Mathf.Min(_line, _level + _rate * dt);
+                bool running = Elapsed > 1f && _level < _line;
+                if (running) _level = Mathf.Min(_line, _level + _rate * dt);
                 _drink.sizeDelta = new Vector2(GlassW - 8f, _level);
+                Stream(running);
                 return;
             }
-            if (!CanAct) return;
-            bool held = KeyInput.MouseHeld();
+            if (!CanMove) return;
+            // The rule card's demo pours like a player: a second in it holds, and it lets go as the
+            // drink (with whatever settles after) is about to reach the line.
+            bool held = CanAct ? KeyInput.MouseHeld()
+                : Elapsed > 1f && _releasedAt < 0f && _level + FlowAt(Elapsed - _pourStart) * (dt + _settleShare) < _line;
+            if (Demo) HoldAt(new Vector2(GlassW * 0.5f + 70f, _glassBottom + _line), held); // resting by the line, held down while it pours
 
             if (_releasedAt < 0f)
             {
@@ -113,6 +131,7 @@ namespace Smartest.Minigames
             }
 
             _drink.sizeDelta = new Vector2(GlassW - 8f, Mathf.Min(_level, _inner));
+            Stream(_pouring && _releasedAt < 0f);
             if (_level >= _inner) { Fail("SPILLED"); return; }
 
             if (_releasedAt >= 0f && (_settleLeft <= 0f || Elapsed - _releasedAt >= SettleFor))
@@ -130,8 +149,16 @@ namespace Smartest.Minigames
             }
         }
 
+        /// <summary>The stream from the tap down to the drink's surface, or nothing.</summary>
+        private void Stream(bool on)
+        {
+            if (_stream.gameObject.activeSelf != on) _stream.gameObject.SetActive(on);
+            if (on) _stream.sizeDelta = new Vector2(14f, Mathf.Max(0f, _mouthY - (_glassBottom + Mathf.Min(_level, _inner))));
+        }
+
         private void Fail(string why)
         {
+            if (_stream != null) _stream.gameObject.SetActive(false);
             if (_label != null) { _label.text = why; _label.color = Palette.Red; }
             if (_drinkImage != null) _drinkImage.color = Palette.Red;
             Finish(true, WorstMetric);

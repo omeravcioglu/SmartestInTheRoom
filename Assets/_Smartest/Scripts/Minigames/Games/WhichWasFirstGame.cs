@@ -80,10 +80,13 @@ namespace Smartest.Minigames
             }
 
             if (_allLit && Elapsed - _shownAt > 4f) { Fail("TOO SLOW"); return; }
-            if (!CanAct) return;
 
-            int key = KeyInput.DigitPressed();
+            // The rule card's demo (never a spectator: it gives the answer away) watches every
+            // box light, then a beat later presses the first one's number.
+            int key = CanAct ? KeyInput.DigitPressed()
+                : (Demo && Elapsed >= Mathf.Max(_times) + 0.35f ? _first + 1 : 0);
             if (key <= 0 || key > _count) return;
+            if (Demo) PressKey(key.ToString());
             // A press registered on the frame the first box appears was made before it was seen.
             if (!_allLit || litNow) { Fail("TOO EARLY"); return; }
 

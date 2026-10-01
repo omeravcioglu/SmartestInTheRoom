@@ -72,7 +72,7 @@ namespace Smartest.Minigames
                     float x0 = RandomRange(-_halfW + 80f, _halfW - 80f);
                     // Drifts toward the middle rather than out of the box.
                     float vx = RandomRange(0f, 120f) * (x0 > 0f ? -1f : 1f);
-                    var img = UiKit.Dot(Area, "Throw" + made, _r * 2f, new Vector2(x0, _floorY), Palette.Accent);
+                    var img = UiKit.Art(Area, "Throw" + made, "coin", new Vector2(_r * 2f, _r * 2f), new Vector2(x0, _floorY), Palette.Accent);
                     img.gameObject.SetActive(false);
                     _throws.Add(new Throw { X0 = x0, VX = vx, VY = vy, Start = t, View = (RectTransform)img.transform, Image = img });
                 }
@@ -102,6 +102,8 @@ namespace Smartest.Minigames
                 if (age < 0f) continue;
                 if (!k.View.gameObject.activeSelf) k.View.gameObject.SetActive(true);
                 k.View.anchoredPosition = PositionAt(k, age);
+                // Flipping end over end on the way up and down.
+                k.View.localScale = new Vector3(Mathf.Max(0.15f, Mathf.Abs(Mathf.Cos(age * 7f + i))), 1f, 1f);
 
                 // Back down on the floor without being caught.
                 if (age > 2f * k.VY / Gravity)
@@ -118,9 +120,42 @@ namespace Smartest.Minigames
                 }
             }
 
+            if (Demo) PlayDemo();
+
             if (!CanAct || !KeyInput.MousePressed()) return;
             if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var click)) return;
+            Hit(click);
+        }
 
+        /// <summary>
+        /// The rule card's demo: the hand picks up each throw on its way up, the one landing
+        /// first first, follows it, and clicks it as it slows towards the top.
+        /// </summary>
+        private void PlayDemo()
+        {
+            int next = -1;
+            float lands = float.MaxValue;
+            for (int i = 0; i < _throws.Count; i++)
+            {
+                var k = _throws[i];
+                if (k.Hit || k.Gone || Elapsed < k.Start) continue;
+                float down = k.Start + 2f * k.VY / Gravity;
+                if (down < lands) { lands = down; next = i; }
+            }
+            if (next < 0) return;
+            float age = Elapsed - _throws[next].Start;
+            if (age < 0.3f) return;
+            var at = PositionAt(_throws[next], age);
+            PointAt(at);
+            if (age < 0.6f) return;
+            TapAt(at);
+            Hit(at);
+        }
+
+        /// <summary>A click, the player's or the demo's: it hits the nearest throw in the air under it.</summary>
+        private void Hit(Vector2 click)
+        {
+            if (!CanMove) return;
             // The nearest one in the air under the click.
             int best = -1;
             float bestD = float.MaxValue;
@@ -137,6 +172,7 @@ namespace Smartest.Minigames
             hit.Hit = true;
             hit.HitAt = Elapsed;
             hit.Image.color = Palette.Green;
+            hit.View.localScale = Vector3.one * 1.15f; // caught face on
             _throws[best] = hit;
             _reactionSum += Elapsed - hit.Start;
             _hits++;

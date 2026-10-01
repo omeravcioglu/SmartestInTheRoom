@@ -128,7 +128,9 @@ namespace Smartest.Minigames
         {
             if (_text == null) return;
             var c = _text.color;
-            bool changed = c != _applied && c != _seen;
+            // Anything but what we put there is the game's, even the colour it set last time:
+            // "GOAL" twice in a row is green twice, and the second must go on the chip too.
+            bool changed = c != _applied;
             bool textChanged = _kind == Kind.Hint && _chip != null && _chip.gameObject.activeSelf && _text.text != _lastString;
             if (!changed && !textChanged) return;
             if (changed) _seen = c;

@@ -104,6 +104,8 @@ namespace Smartest.Minigames
                 }
 
                 var img = UiKit.Dot(Area, "Ball" + i, BallR * 2f, new Vector2(x, _spawnY), red ? Palette.Red : Palette.Accent);
+                // Red is marked, so it isn't told from gold by colour alone.
+                if (red) UiKit.Marker(img.transform, "Mark", UiKit.Mark.Diamond, BallR * 1.15f, Vector2.zero, Palette.OnRed);
                 img.gameObject.SetActive(false);
                 _drops[i] = new Drop { X = x, Red = red, Spawn = spawn, View = (RectTransform)img.transform, Image = img };
                 if (!red) _golds++;
@@ -111,7 +113,9 @@ namespace Smartest.Minigames
             Progress("CAUGHT", 0, _golds);
 
             _basketX = 0f;
-            _basket = (RectTransform)UiKit.Box(Area, "Basket", new Vector2(_basketW, BasketH), new Vector2(0f, basketY), Palette.Ink).transform;
+            // The basket's rim is the catching line.
+            _basket = (RectTransform)UiKit.Art(Area, "Basket", "basket", new Vector2(_basketW + 12f, BasketH + 10f),
+                new Vector2(0f, _catchY - (BasketH + 10f) * 0.5f + 2f)).transform;
             _label = UiKit.Label(Area, "Hint", StartHint, 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
         }
@@ -162,7 +166,7 @@ namespace Smartest.Minigames
                 if (y < _bottom - BallR) { d.Gone = true; d.View.gameObject.SetActive(false); }
             }
 
-            if (allDone && CanAct)
+            if (allDone && CanMove)
             {
                 _label.text = "ALL CAUGHT";
                 _label.color = Palette.Green;
@@ -180,15 +184,40 @@ namespace Smartest.Minigames
             }
             else if (!Interactive)
             {
-                // Someone watching sees the basket go after the next gold ball.
+                // Someone watching sees the basket go after the next gold ball, and keep out from
+                // under a red one that's about to land.
+                float want = _basketX;
                 for (int i = 0; i < _drops.Length; i++)
                 {
                     if (_drops[i].Judged || _drops[i].Red || Elapsed < _drops[i].Spawn) continue;
-                    _basketX = Mathf.MoveTowards(_basketX, Mathf.Clamp(_drops[i].X, -limit, limit), 900f * dt);
+                    want = Mathf.Clamp(_drops[i].X, -limit, limit);
                     break;
                 }
+                _basketX = Mathf.MoveTowards(_basketX, ClearOfReds(want, limit), 900f * dt);
             }
             _basket.anchoredPosition = new Vector2(_basketX, _basket.anchoredPosition.y);
+            if (Demo) PointAt(_basket.anchoredPosition); // the basket goes where the mouse is: the demo's hand is on it
+        }
+
+        /// <summary>
+        /// Where the basket can head without a red ball landing in it: for each red that's nearly
+        /// down, it stays on its own side of it (the far side if its own side has no room).
+        /// </summary>
+        private float ClearOfReds(float want, float limit)
+        {
+            float clear = _basketW * 0.5f + BallR * 2f; // its middle a ball's width past the rim: a plain miss
+            for (int i = 0; i < _drops.Length; i++)
+            {
+                var d = _drops[i];
+                if (!d.Red || d.Judged || Elapsed < d.Spawn) continue;
+                float landsIn = (_spawnY - _fallSpeed * (Elapsed - d.Spawn) - BallR - _catchY) / _fallSpeed;
+                if (landsIn > 0.45f) continue; // far enough up to cross under it first
+                bool left = _basketX < d.X;
+                if (left && d.X - clear < -limit) left = false;
+                else if (!left && d.X + clear > limit) left = true;
+                want = left ? Mathf.Min(want, d.X - clear) : Mathf.Max(want, d.X + clear);
+            }
+            return Mathf.Clamp(want, -limit, limit);
         }
 
         private void Fail(string why)

@@ -92,14 +92,13 @@ namespace Smartest.Minigames
                 _v.Add(Vector2.zero);
                 _penned.Add(false);
                 _wander.Add(new Vector2(RandomRange(0f, 6.3f), RandomRange(0.7f, 1.3f)));
-                var body = UiKit.Dot(Area, "Sheep" + i, SheepR * 2f, p, Palette.PaperHi);
-                UiKit.Dot(body.transform, "Face", 14f, new Vector2(SheepR * 0.7f, 0f), Palette.Ink);
+                // From above, nose first; the wool is about the size of the body that's simulated.
+                var body = UiKit.Art(Area, "Sheep" + i, "sheep", new Vector2(50f, 40f) * (SheepR * 2f / 36f), p, Palette.PaperHi);
                 _views.Add((RectTransform)body.transform);
             }
             _dog = new Vector2(_field.xMin + 30f, _field.center.y);
-            // The dog: black with a white chest, so it's never mistaken for a sheep or the pond.
-            _dogView = (RectTransform)UiKit.Dot(Area, "Dog", 34f, _dog, Palette.Ink).transform;
-            UiKit.Dot(_dogView, "Chest", 12f, Vector2.zero, Palette.PaperHi);
+            // The dog: black and white, so it's never mistaken for a sheep or the pond.
+            _dogView = (RectTransform)UiKit.Art(Area, "Dog", "dog", new Vector2(42f, 42f), _dog).transform;
 
             Progress("PENNED", 0, sheep);
             _label = UiKit.Label(Area, "Hint", "HERD THEM INTO THE PEN", 26f, Palette.TextDim,
@@ -142,6 +141,7 @@ namespace Smartest.Minigames
             else want = _dog;
             _dog = new Vector2(Mathf.Clamp(want.x, _field.xMin, _field.xMax), Mathf.Clamp(want.y, _field.yMin, _field.yMax));
             _dogView.anchoredPosition = _dog;
+            if (!Interactive) PointAt(_dog); // the dog goes where the mouse is: the demo's hand is on it
 
             _acc += dt;
             while (_acc >= PhysicsStep)

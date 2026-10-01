@@ -1,4 +1,5 @@
 using System;
+using Smartest.Core;
 using UnityEngine;
 
 namespace Smartest.Minigames
@@ -57,6 +58,8 @@ namespace Smartest.Minigames
             IsDone = false;
             Progressed = default;
             TriesLeft = default;
+            DemoHand = default;
+            _answerShownAt = -1f;
             if (Area != null) UiKit.Clear(Area);
             Build();
         }
@@ -168,6 +171,94 @@ namespace Smartest.Minigames
         private static bool Same(Reading a, Reading b) =>
             a.Word == b.Word && a.Value == b.Value && a.Total == b.Total && Mathf.Abs(a.Fill - b.Fill) < 0.004f;
 
+        // ---- the rule card's demo ----
+
+        /// <summary>
+        /// True while this level is the demo on the rule card: played by the game itself with
+        /// its sounds off, showing its moves (a hand that points and clicks, keys that light up)
+        /// so a player sees what to do before their own level starts. Set it before Prepare. A
+        /// demo is never Interactive, and nothing it does reaches the host.
+        ///
+        /// Games play themselves in their not-Interactive path, which knocked-out players watch
+        /// too. Moves that would give an answer away (a memory game's sequence, the odd one out)
+        /// belong behind Demo, so someone watching the real level never sees it solved for them.
+        /// </summary>
+        public bool Demo { get; set; }
+
+        /// <summary>
+        /// The level the demo plays: 1, unless level 1 hides what the game is about (Stroop's
+        /// never prints a word in the other colour). Read before Prepare.
+        /// </summary>
+        public virtual int DemoLevel => 1;
+
+        /// <summary>The demo's hand: whether it's shown, where it is (in the play area's space), and whether its button is down.</summary>
+        public struct Hand
+        {
+            public bool Shown;
+            public Vector2 At;
+            public bool Down;
+        }
+
+        public Hand DemoHand { get; private set; }
+        /// <summary>The demo clicked here, in the play area's space.</summary>
+        public event Action<Vector2> DemoTapped;
+        /// <summary>The demo pressed a key, named as the controls name it: "SPACE", "1", "W", "A".</summary>
+        public event Action<string> DemoKeyPressed;
+
+        /// <summary>
+        /// The level can take a move: the player's, or the demo's. For the methods a click or a
+        /// key and the demo both go through (a cell's click, a throw). Reading the mouse or the
+        /// keyboard still wants CanAct, so the demo never reacts to the real player's hands.
+        /// </summary>
+        protected bool CanMove => Running && !IsDone && (Interactive || Demo);
+
+        /// <summary>Move the hand without clicking. Cheap; call it every tick while playing yourself.</summary>
+        protected void PointAt(Vector2 at) => DemoHand = new Hand { Shown = true, At = at, Down = DemoHand.Down };
+
+        /// <summary>Move the hand and hold its button down, or let go: hold-to-rise, hold-to-run, drag.</summary>
+        protected void HoldAt(Vector2 at, bool down) => DemoHand = new Hand { Shown = true, At = at, Down = down };
+
+        /// <summary>Click here: the hand jumps there and taps.</summary>
+        protected void TapAt(Vector2 at)
+        {
+            DemoHand = new Hand { Shown = true, At = at, Down = false };
+            DemoTapped?.Invoke(at);
+        }
+
+        protected void HideHand() => DemoHand = default;
+
+        /// <summary>Press a key, by the name the controls use.</summary>
+        protected void PressKey(string key) => DemoKeyPressed?.Invoke(key);
+
+        private const float AnswerLag = 0.45f; // about as long as the rule card shows a key
+        private float _answerShownAt = -1f;
+
+        /// <summary>
+        /// A key that answers a question, for a demo: shows the key now and says yes a moment
+        /// later, when the game should take it. A game that takes it at once shows the next
+        /// question at once, and the key pops up beside a question it doesn't answer. Call it
+        /// every tick once the demo has made up its mind.
+        /// </summary>
+        protected bool DemoAnswer(string key)
+        {
+            if (_answerShownAt < 0f)
+            {
+                PressKey(key);
+                _answerShownAt = Elapsed;
+                return false;
+            }
+            if (Elapsed - _answerShownAt < AnswerLag) return false;
+            _answerShownAt = -1f;
+            return true;
+        }
+
+        /// <summary>Where a piece of the level is, in the play area's space: for pointing the hand at a cell or a card.</summary>
+        protected Vector2 Where(Component c)
+        {
+            if (c == null || Area == null) return Vector2.zero;
+            return (Vector2)Area.InverseTransformPoint(c.transform.position) - Area.rect.center;
+        }
+
         /// <summary>Size of the drawing area. Games lay themselves out relative to this.</summary>
         protected Vector2 AreaSize
         {
@@ -191,7 +282,18 @@ namespace Smartest.Minigames
         protected float RandomRange(float min, float max) => LevelRng.Range(Rng, min, max);
         protected int RandomRange(int minInclusive, int maxExclusive) => LevelRng.Range(Rng, minInclusive, maxExclusive);
 
-        private void Update() => Advance(Time.unscaledDeltaTime);
+        // A demo's longest step. After a hitch (the card being built, a slow frame) a demo would
+        // jump past its own cue in one step and fumble, a keeper would land on the ball; a demo
+        // just runs slow for that frame instead.
+        private const float DemoLongestStep = 0.05f;
+
+        private void Update()
+        {
+            if (!Demo) { Advance(Time.unscaledDeltaTime); return; }
+            Sounds.Hush(true);
+            try { Advance(Mathf.Min(Time.unscaledDeltaTime, DemoLongestStep)); }
+            finally { Sounds.Hush(false); }
+        }
 
         /// <summary>One tick of the level. Update drives it in play; tests drive it with a fixed step.</summary>
         public void Advance(float dt)

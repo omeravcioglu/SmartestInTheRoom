@@ -27,6 +27,10 @@ namespace Smartest.Minigames
         private Vector2 _last;
         private RectTransform _torch, _world;
         private TMP_Text _label;
+        private Vector2[] _demoRoute = new Vector2[0]; // the demo's way: START, each cell's middle, the exit
+        private int _demoNext;
+        private float _demoWait;
+        private Vector2 _demoAt;                        // the demo's mouse
 
         protected override void Build()
         {
@@ -75,8 +79,57 @@ namespace Smartest.Minigames
             UiKit.Label(Area, "StartText", "START", 20f, torchR > 0f ? Palette.PaperHi : Palette.Ink, new Vector2(90f, 30f),
                 _startPad.center + new Vector2(0f, _startPad.height * 0.5f + 16f));
 
-            _label = UiKit.Label(Area, "Hint", Interactive ? "GO TO START" : "FIND THE GOLD EXIT", 26f, Palette.TextDim,
+            _label = UiKit.Label(Area, "Hint", Interactive || Demo ? "GO TO START" : "FIND THE GOLD EXIT", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+
+            // The demo knows the way; its hand starts below the maze, under START.
+            if (Demo) _demoRoute = Solve();
+            _demoNext = 0;
+            _demoWait = 0f;
+            _demoAt = new Vector2(_startPad.center.x - 20f, _y0 - h - 50f);
+        }
+
+        /// <summary>
+        /// The one way through, found by a search over the carved walls, as points to walk: START,
+        /// the middle of each cell on the way, then the exit. Cell to cell through the middle of
+        /// each corridor never comes near a wall.
+        /// </summary>
+        private Vector2[] Solve()
+        {
+            var cameFrom = new Vector2Int[_cols, _rows];
+            var seen = new bool[_cols, _rows];
+            var queue = new Queue<Vector2Int>();
+            var entry = new Vector2Int(0, _inRow);
+            var exit = new Vector2Int(_cols - 1, _outRow);
+            void Visit(Vector2Int here, int c, int r, bool open)
+            {
+                if (!open || seen[c, r]) return;
+                seen[c, r] = true;
+                cameFrom[c, r] = here;
+                queue.Enqueue(new Vector2Int(c, r));
+            }
+            seen[entry.x, entry.y] = true;
+            queue.Enqueue(entry);
+            while (queue.Count > 0)
+            {
+                var at = queue.Dequeue();
+                if (at == exit) break;
+                if (at.x < _cols - 1) Visit(at, at.x + 1, at.y, !_right[at.x, at.y]);
+                if (at.x > 0) Visit(at, at.x - 1, at.y, !_right[at.x - 1, at.y]);
+                if (at.y < _rows - 1) Visit(at, at.x, at.y + 1, !_down[at.x, at.y]);
+                if (at.y > 0) Visit(at, at.x, at.y - 1, !_down[at.x, at.y - 1]);
+            }
+
+            var cells = new List<Vector2Int>();
+            for (var cell = exit; cell != entry && cells.Count < _cols * _rows; cell = cameFrom[cell.x, cell.y]) cells.Add(cell);
+            cells.Add(entry);
+            cells.Reverse();
+            var route = new Vector2[cells.Count + 2];
+            route[0] = _startPad.center;
+            for (int i = 0; i < cells.Count; i++)
+                route[i + 1] = new Vector2(_x0 + (cells[i].x + 0.5f) * _c, _y0 - (cells[i].y + 0.5f) * _c);
+            route[route.Length - 1] = _endPad.center;
+            return route;
         }
 
         /// <summary>A perfect maze by randomised depth-first search: every cell reachable, one way between any two.</summary>
@@ -158,12 +211,13 @@ namespace Smartest.Minigames
             // Someone watching sees a torch sweeping to and fro across the maze.
             var p = new Vector2(_x0 + _cols * _c * 0.5f * (1f + Mathf.Sin(Elapsed * 0.5f)), _y0 - _rows * _c * 0.5f);
             if (CanAct && UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var m)) p = m;
+            else if (Demo) p = DemoWalk(dt); // the rule card's demo plays it for real
             if (_torch != null)
             {
                 _torch.anchoredPosition = p;
                 _world.anchoredPosition = -p;
             }
-            if (!CanAct) return;
+            if (!CanMove) return;
 
             if (!_armed)
             {
@@ -197,6 +251,26 @@ namespace Smartest.Minigames
                 Finish(false, Ms(Elapsed - _armedAt));
             }
             else if (Elapsed > Limit) Fail("LOST IN THERE");
+        }
+
+        /// <summary>
+        /// The rule card's demo: a beat, over to START, a breath there, then the way out cell by
+        /// cell at a careful pace, and on into the exit.
+        /// </summary>
+        private Vector2 DemoWalk(float dt)
+        {
+            if (Elapsed >= 0.3f && Elapsed >= _demoWait && _demoNext < _demoRoute.Length)
+            {
+                var to = _demoRoute[_demoNext];
+                _demoAt = Vector2.MoveTowards(_demoAt, to, (_demoNext == 0 ? 600f : 420f) * dt);
+                if (_demoAt == to)
+                {
+                    if (_demoNext == 0) _demoWait = Elapsed + 0.25f;
+                    _demoNext++;
+                }
+            }
+            PointAt(_demoAt);
+            return _demoAt;
         }
 
         private void Fail(string why)

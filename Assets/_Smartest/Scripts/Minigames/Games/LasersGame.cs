@@ -36,6 +36,7 @@ namespace Smartest.Minigames
         /// <summary>When the beams set off; negative until the cursor first gets into the box.</summary>
         private float _armedAt = -1f;
         private float _closest = float.MaxValue;
+        private Vector2 _demoAt; // the demo's mouse
 
         /// <summary>Bigger clearance is better, so the worst result is none at all.</summary>
         public override int WorstMetric => 0;
@@ -93,9 +94,11 @@ namespace Smartest.Minigames
                 _beams[i] = b;
             }
 
-            _label = UiKit.Label(Area, "Hint", Interactive ? "GET IN THE BOX" : "MIND THE BEAMS", 26f, Palette.TextDim,
+            _label = UiKit.Label(Area, "Hint", Interactive || Demo ? "GET IN THE BOX" : "MIND THE BEAMS", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
             Progress("BEAMS", 0, n);
+            // The demo's hand starts just below the box, under where it will wait for the first beam.
+            _demoAt = new Vector2(DemoWait(0f).x, _box.yMin - 40f);
         }
 
         /// <summary>Two red bars with the gap between them, parked just outside the box.</summary>
@@ -128,7 +131,8 @@ namespace Smartest.Minigames
 
         protected override void OnTick(float dt)
         {
-            if (!Interactive && _armedAt < 0f) _armedAt = 0f; // someone watching sees them straight away
+            // Someone watching sees them straight away; the demo gets in the box first, like a player.
+            if (!Interactive && !Demo && _armedAt < 0f) _armedAt = 0f;
             float t = _armedAt < 0f ? 0f : Elapsed - _armedAt;
             for (int i = 0; i < _beams.Length; i++)
             {
@@ -145,8 +149,9 @@ namespace Smartest.Minigames
                     b.B.anchoredPosition = new Vector2(b.B.anchoredPosition.x, p);
                 }
             }
-            if (!CanAct) return;
-            if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var cursor)) return;
+            Vector2 cursor;
+            if (Demo) cursor = DemoDodge(t, dt);
+            else if (!CanAct || !UiKit.LocalPoint(Area, KeyInput.MousePosition(), out cursor)) return;
 
             if (_armedAt < 0f)
             {
@@ -206,6 +211,38 @@ namespace Smartest.Minigames
                 // Tenths of a pixel: whole pixels would tie, and a tie means a play-off.
                 Finish(false, Mathf.RoundToInt(Mathf.Max(0f, closest) * 10f));
             }
+        }
+
+        /// <summary>The rule card's demo: up into the box, then over into each beam's gap before the beam gets there.</summary>
+        private Vector2 DemoDodge(float t, float dt)
+        {
+            if (Elapsed >= 0.1f) _demoAt = Vector2.MoveTowards(_demoAt, DemoWait(t), 500f * dt);
+            PointAt(_demoAt);
+            return _demoAt;
+        }
+
+        /// <summary>
+        /// Where the demo waits at t: the middle of the box, slid across into the gap of the beam
+        /// that passes the middle next. It moves on once that beam is well clear.
+        /// </summary>
+        private Vector2 DemoWait(float t)
+        {
+            int next = -1;
+            float soonest = float.MaxValue;
+            for (int i = 0; i < _beams.Length; i++)
+            {
+                var b = _beams[i];
+                float middle = b.Vertical ? _box.center.x : _box.center.y;
+                float gone = b.Start + (Mathf.InverseLerp(b.From, b.To, middle) + (Thickness * 0.5f + 40f) / Mathf.Abs(b.To - b.From)) * _duration;
+                if (gone > t && gone < soonest) { soonest = gone; next = i; }
+            }
+            var at = _box.center;
+            if (next >= 0)
+            {
+                if (_beams[next].Vertical) at.y = _beams[next].GapCentre;
+                else at.x = _beams[next].GapCentre;
+            }
+            return at;
         }
 
         private void Fail(string why)

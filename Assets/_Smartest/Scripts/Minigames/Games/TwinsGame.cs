@@ -67,6 +67,22 @@ namespace Smartest.Minigames
                 _colours[i] = shuffleColours ? RandomRange(0, Inks.Length) : v - 1;
             }
 
+            // The rule card cuts its demo off at seven seconds, on the fifth card. If this deck's
+            // first pair comes later, the demo deals one sooner (never three in a row), so it gets
+            // to show a click.
+            if (Demo)
+            {
+                int first = 1;
+                while (first < n && !IsTwin(first)) first++;
+                for (int i = 2; first > 4 && i <= 4; i++)
+                {
+                    if (_values[i + 1] == _values[i - 1]) continue;
+                    _values[i] = _values[i - 1];
+                    if (!shuffleColours) _colours[i] = _values[i] - 1;
+                    break;
+                }
+            }
+
             // A plain box, not a kit cell: a red or green card here is just a colour, and a cell
             // would stamp it with a cross or a tick.
             _cardImage = UiKit.Box(Area, "Card", new Vector2(220f, 280f), new Vector2(0f, 30f), Palette.PanelRaised);
@@ -84,10 +100,10 @@ namespace Smartest.Minigames
             if (due > _shown)
             {
                 // The card we're leaving was a pair nobody clicked.
-                if (CanAct && _shown >= 0 && IsTwin(_shown) && !_answered) { Fail("MISSED A PAIR"); return; }
+                if (CanMove && _shown >= 0 && IsTwin(_shown) && !_answered) { Fail("MISSED A PAIR"); return; }
                 if (due >= _values.Length)
                 {
-                    if (CanAct)
+                    if (CanMove)
                     {
                         _label.text = "SHARP";
                         _label.color = Palette.Green;
@@ -111,7 +127,28 @@ namespace Smartest.Minigames
             float since = Elapsed - FirstFlip - _shown * _interval;
             _card.localScale = new Vector3(_shown < 0 ? 1f : Mathf.Clamp01(since / FlipTime), 1f, 1f);
 
+            // The rule card's demo rests the pointer on the card, under the number, and clicks a
+            // beat after a pair turns up.
+            if (Demo && _shown >= 0)
+            {
+                var spot = Where(_card) + new Vector2(30f, -85f);
+                PointAt(spot);
+                if (IsTwin(_shown) && !_answered && since >= 0.4f)
+                {
+                    TapAt(spot);
+                    Snap(since);
+                }
+                return;
+            }
+
             if (!CanAct || _shown < 0 || !KeyInput.MousePressed() || _answered) return;
+            Snap(since);
+        }
+
+        /// <summary>A click while a card shows: the player's, or the rule card's demo's.</summary>
+        private void Snap(float since)
+        {
+            if (!CanMove || _shown < 0 || _answered) return;
             if (!IsTwin(_shown)) { Fail("NOT A PAIR"); return; }
             _answered = true;
             _reactionSum += since;

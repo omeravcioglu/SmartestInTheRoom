@@ -61,11 +61,23 @@ namespace Smartest.Minigames
         protected override void OnTick(float dt)
         {
             if (CanAct && Elapsed > Limit) Fail("TOO SLOW");
+
+            // The rule card's demo takes a look, clicks the 1, then the rest from memory, a tile a beat.
+            if (Demo && !IsDone && Elapsed >= 0.6f)
+            {
+                int tile = _next - 1; // tile i holds i + 1
+                PointAt(Where(_tiles[tile]));
+                if (Elapsed >= 1.2f + tile * 0.5f)
+                {
+                    TapAt(Where(_tiles[tile]));
+                    OnTile(tile);
+                }
+            }
         }
 
         private void OnTile(int tile)
         {
-            if (!CanAct) return;
+            if (!CanMove) return;
             if (_valueOf[tile] != _next)
             {
                 _tiles[tile].color = Palette.Red;

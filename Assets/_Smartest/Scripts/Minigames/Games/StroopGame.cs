@@ -24,6 +24,9 @@ namespace Smartest.Minigames
         private float _perPrompt;
         private float _promptStart;
 
+        // Level 1's words are all in their own colour, which hides the trap: the demo shows level 2's.
+        public override int DemoLevel => 2;
+
         protected override void Build()
         {
             var size = AreaSize;
@@ -86,9 +89,11 @@ namespace Smartest.Minigames
         {
             if (_index >= _words.Length) return;
             if (Elapsed - _promptStart > _perPrompt) { Fail("TOO SLOW"); return; }
-            if (!CanAct) return;
 
-            int key = KeyInput.DigitPressed();
+            // The rule card's demo (never a spectator: it gives the answers away) reads the ink
+            // and answers after a reader's pause.
+            int key = CanAct ? KeyInput.DigitPressed()
+                : (Demo && Elapsed - _promptStart >= 0.9f && DemoAnswer(_inks[_index].ToString()) ? _inks[_index] : 0);
             if (key != 1 && key != 2) return;
             if (key != _inks[_index]) { Fail("WRONG"); return; }
 

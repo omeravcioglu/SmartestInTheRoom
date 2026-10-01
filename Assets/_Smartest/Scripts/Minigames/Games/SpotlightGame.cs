@@ -25,6 +25,10 @@ namespace Smartest.Minigames
         private Image _targetImage;
         private TMP_Text _label;
         private Vector2 _wanderFreq;
+        private Vector2 _demoAt;       // the demo's torch
+        private int _demoLeg;          // which stretch of its sweep the demo is on
+        private float _demoSeenAt;     // when the gold showed in the demo's light; negative until then
+        private float _demoStill;      // how long the demo has been on it
 
         protected override void Build()
         {
@@ -77,6 +81,11 @@ namespace Smartest.Minigames
 
             _label = UiKit.Label(Area, "Hint", "FIND THE GOLD", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            // The demo's torch starts where the torch does, in the middle.
+            _demoAt = centre;
+            _demoLeg = 0;
+            _demoSeenAt = -1f;
+            _demoStill = 0f;
         }
 
         private bool TooClose(Vector2 p)
@@ -91,6 +100,7 @@ namespace Smartest.Minigames
         {
             Vector2 at;
             if (CanAct && UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var cursor)) at = cursor;
+            else if (Demo) at = DemoSearch(dt); // the demo hunts for it with the torch, and clicks it
             else // someone watching sees the torch sweep about on its own
                 at = _box.center + new Vector2(_box.width * 0.4f * Mathf.Sin(_wanderFreq.x * Elapsed), _box.height * 0.4f * Mathf.Sin(_wanderFreq.y * Elapsed));
             var p = new Vector2(Mathf.Clamp(at.x, _box.xMin, _box.xMax), Mathf.Clamp(at.y, _box.yMin, _box.yMax));
@@ -99,8 +109,47 @@ namespace Smartest.Minigames
 
             if (!CanAct) return;
             if (Elapsed > Limit) { Fail("TOO SLOW"); return; }
-            if (!KeyInput.MousePressed() || !_box.Contains(at)) return;
+            if (KeyInput.MousePressed()) Click(at);
+        }
 
+        /// <summary>
+        /// The rule card's demo: a beat, then a sweep with the torch along the half the gold is in
+        /// (a wrong guess first, then back across) until the gold shows in the light; a moment to
+        /// see it, over to it, and click.
+        /// </summary>
+        private Vector2 DemoSearch(float dt)
+        {
+            if (_demoSeenAt < 0f && Vector2.Distance(_demoAt, _target) <= _torch.sizeDelta.x * 0.5f - _targetR) _demoSeenAt = Elapsed;
+            if (Elapsed >= 0.3f)
+            {
+                if (_demoSeenAt < 0f && _demoLeg < 2)
+                {
+                    float side = _target.x >= _box.center.x ? 1f : -1f;
+                    var to = new Vector2(_box.center.x + side * (_demoLeg == 0 ? -250f : 420f),
+                                         _box.center.y + (_target.y >= _box.center.y ? 80f : -80f));
+                    _demoAt = Vector2.MoveTowards(_demoAt, to, 450f * dt);
+                    if (_demoAt == to) _demoLeg++;
+                }
+                else if (_demoSeenAt < 0f || Elapsed - _demoSeenAt >= 0.3f)
+                {
+                    _demoAt = Vector2.MoveTowards(_demoAt, _target, 500f * dt);
+                    _demoStill = _demoAt == _target ? _demoStill + dt : 0f;
+                    if (_demoStill >= 0.25f)
+                    {
+                        TapAt(_demoAt);
+                        Click(_demoAt);
+                        return _demoAt;
+                    }
+                }
+            }
+            PointAt(_demoAt);
+            return _demoAt;
+        }
+
+        /// <summary>A click, the player's or the demo's: the gold one wins, a plain one puts you out.</summary>
+        private void Click(Vector2 at)
+        {
+            if (!CanMove || !_box.Contains(at)) return;
             if (Vector2.Distance(at, _target) <= _targetR + 6f)
             {
                 _targetImage.color = Palette.Green;

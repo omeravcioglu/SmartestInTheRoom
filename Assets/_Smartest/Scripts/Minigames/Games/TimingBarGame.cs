@@ -72,7 +72,12 @@ namespace Smartest.Minigames
             Place(pos);
 
             if (Elapsed > 8f) { Fail("TOO SLOW"); return; }
-            if (!CanAct || !KeyInput.SpacePressed()) return;
+            // The rule card's demo lets the marker run to the far end once, then stops it on the
+            // way back, as it crosses the middle of the gold.
+            bool press = CanAct ? KeyInput.SpacePressed()
+                : Demo && Elapsed * _speed * 2f > 1f && Mathf.Abs(pos - CentreNow()) <= _speed * 2f * dt;
+            if (!press) return;
+            if (Demo) PressKey("SPACE");
 
             float d = Mathf.Abs(pos - CentreNow());
             if (d <= _zoneWidth * 0.5f)

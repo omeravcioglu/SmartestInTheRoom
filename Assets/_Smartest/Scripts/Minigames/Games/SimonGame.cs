@@ -76,12 +76,26 @@ namespace Smartest.Minigames
                 return;
             }
 
+            // The rule card's demo plays it back like a sure player, a box a beat.
+            if (Demo)
+            {
+                if (IsDone) return;
+                int next = _sequence[Backwards ? _sequence.Count - 1 - _index : _index];
+                PointAt(Where(_cells[next]));
+                if (Elapsed - _showUntil >= 0.7f + _index * 0.55f)
+                {
+                    TapAt(Where(_cells[next]));
+                    OnCell(next);
+                }
+                return;
+            }
+
             if (Elapsed - _showUntil > 12f) Fail("TOO SLOW");
         }
 
         private void OnCell(int index)
         {
-            if (!CanAct || !_playing) return;
+            if (!CanMove || !_playing) return;
 
             int expected = _sequence[Backwards ? _sequence.Count - 1 - _index : _index];
             if (index != expected)

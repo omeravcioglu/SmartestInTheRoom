@@ -57,11 +57,26 @@ namespace Smartest.Minigames
                 if (_label != null) { _label.text = "CLICK THEM"; _label.color = Palette.Text; }
             }
             if (_hidden && Elapsed - _showFor > 10f) Fail("TOO SLOW");
+
+            // The rule card's demo clicks the boxes back like a sure player, top row first, a box a beat.
+            if (Demo && _hidden && !IsDone && Elapsed - _showFor >= 0.3f)
+            {
+                int next = -1;
+                for (int i = 0; i < _cells.Length && next < 0; i++)
+                    if (_lit.Contains(i) && !_found.Contains(i)) next = i;
+                if (next < 0) return;
+                PointAt(Where(_cells[next]));
+                if (Elapsed - _showFor >= 0.65f + _found.Count * 0.5f)
+                {
+                    TapAt(Where(_cells[next]));
+                    OnCell(next);
+                }
+            }
         }
 
         private void OnCell(int index)
         {
-            if (!CanAct || !_hidden || _found.Contains(index)) return;
+            if (!CanMove || !_hidden || _found.Contains(index)) return;
 
             if (!_lit.Contains(index))
             {

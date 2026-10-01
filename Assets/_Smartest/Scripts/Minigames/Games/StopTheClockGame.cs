@@ -52,7 +52,10 @@ namespace Smartest.Minigames
                     : "?.??";
 
             if (Elapsed > _target + _tolerance + 1.5f) { Fail("TOO SLOW"); return; }
-            if (!CanAct || !KeyInput.SpacePressed()) return;
+            // The rule card's demo counts it out like a steady player and stops a hair early.
+            bool press = CanAct ? KeyInput.SpacePressed() : Demo && Elapsed >= _target - 0.06f;
+            if (!press) return;
+            if (Demo) PressKey("SPACE");
 
             float error = Mathf.Abs(Elapsed - _target);
             if (_clock != null) _clock.text = Elapsed.ToString("0.00", CultureInfo.InvariantCulture);

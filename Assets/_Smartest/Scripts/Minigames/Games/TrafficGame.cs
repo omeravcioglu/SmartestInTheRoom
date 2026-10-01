@@ -44,6 +44,8 @@ namespace Smartest.Minigames
         private float _waitSum;
         private float _acc;
         private int _cleared;
+        private Car _demoCar;                   // the car the demo's hand is going to click
+        private float _demoSince, _demoClicked = -9f;
         private TMP_Text _label;
 
         protected override void Build()
@@ -126,9 +128,10 @@ namespace Smartest.Minigames
             bool h = Horizontal(car.Dir);
             var size = h ? new Vector2(Length, Width) : new Vector2(Width, Length);
             car.View = UiKit.Node(_roads, "Car", size, Vector2.zero);
-            car.Body = UiKit.Box(car.View, "Body", size, Vector2.zero, colour);
             var fwd = Dirs[car.Dir];
-            UiKit.Fill(car.View, "Glass", h ? new Vector2(10f, Width - 12f) : new Vector2(Width - 12f, 10f), fwd * 14f, Palette.Ink2);
+            // Drawn nose up, then turned to face the way it drives.
+            car.Body = UiKit.Art(car.View, "Body", "car", new Vector2(Width, Length), Vector2.zero, colour);
+            car.Body.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(fwd.y, fwd.x) * Mathf.Rad2Deg - 90f);
             car.Brake = (RectTransform)UiKit.Dot(car.View, "Brake", 14f, -fwd * (Length * 0.5f - 6f), Palette.Red).transform;
             car.Brake.gameObject.SetActive(false);
             car.Rage = UiKit.Fill(car.View, "Rage", new Vector2(56f, 7f), new Vector2(0f, (h ? Width : Length) * 0.5f + 10f), Palette.Accent);
@@ -179,6 +182,7 @@ namespace Smartest.Minigames
         protected override void OnTick(float dt)
         {
             if (CanAct && KeyInput.MousePressed() && UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var m)) Click(m - _crossing);
+            else if (Demo) DemoCop();
             else if (!Interactive) AutoCop();
 
             bool crashed = false, raged = false;
@@ -190,7 +194,7 @@ namespace Smartest.Minigames
             }
             foreach (var c in _cars) Draw(c);
 
-            if (!CanAct) return;
+            if (!CanMove) return;
             Progress("THROUGH", _cleared, _cars.Count);
             if (crashed) { Fail("CRASH!"); return; }
             if (raged) { Fail("ROAD RAGE"); return; }
@@ -204,6 +208,7 @@ namespace Smartest.Minigames
 
         private void Click(Vector2 p)
         {
+            if (!CanMove) return;
             Car best = null;
             float bestD = float.MaxValue;
             foreach (var c in _cars)
@@ -286,6 +291,61 @@ namespace Smartest.Minigames
                 }
                 c.Held = yield;
             }
+        }
+
+        /// <summary>
+        /// The rule card's demo directs the traffic by hand, a click at a time: the watcher's calls
+        /// (whoever is nearer the crossing goes, the other waits), made further out so the hand
+        /// has time to get there. A car that needs stopping comes before one waiting to go, and
+        /// a car with another ahead of it in its lane is left to queue behind that one.
+        /// </summary>
+        private void DemoCop()
+        {
+            // Stops in order of how near the crossing they are, then wave-ons, longest kept first.
+            float Order(Car c) => c.Held ? 1000f - c.Wait : ToCrossing(c);
+            bool Due(Car c) => c != null && !c.Out && Elapsed >= c.At && OnField(c) && c.Held != DemoWaits(c);
+
+            Car next = null;
+            foreach (var c in _cars)
+                if (Due(c) && (next == null || Order(c) < Order(next))) next = c;
+            // The hand stays with its car unless another needs the click well before it.
+            if (!Due(_demoCar) || (next != null && Order(next) < Order(_demoCar) - 40f))
+            {
+                if (_demoCar != next) _demoSince = Elapsed;
+                _demoCar = next;
+            }
+
+            if (_demoCar == null)
+            {
+                if (!DemoHand.Shown) PointAt(_crossing + new Vector2(120f, 100f)); // waiting beside the crossing
+                return;
+            }
+            var at = Centre(_demoCar);
+            PointAt(_crossing + at);
+            if (Elapsed - _demoSince < 0.25f || Elapsed - _demoClicked < 0.35f) return;
+            TapAt(_crossing + at);
+            Click(at);
+            _demoClicked = Elapsed;
+            _demoCar = null;
+        }
+
+        /// <summary>The demo's call for one car: should it be stopped now?</summary>
+        private bool DemoWaits(Car c)
+        {
+            const float look = 200f;
+            if (c.Out || Elapsed < c.At || c.Cleared) return false;
+            float mine = ToCrossing(c);
+            if (mine < 0f || mine > look) return false;
+            // One with a car ahead of it in its lane will queue behind that one.
+            foreach (var o in _cars)
+                if (o != c && o.Dir == c.Dir && !o.Out && Elapsed >= o.At && !o.Cleared && o.Pos > c.Pos) return false;
+            foreach (var o in _cars)
+            {
+                if (o.Out || Elapsed < o.At || o.Cleared || Horizontal(o.Dir) == Horizontal(c.Dir)) continue;
+                float theirs = ToCrossing(o);
+                if (theirs < 0f || (theirs < look && (theirs < mine || (theirs == mine && !Horizontal(o.Dir))))) return true;
+            }
+            return false;
         }
 
         private void Fail(string why)

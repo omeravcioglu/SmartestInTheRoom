@@ -168,6 +168,40 @@ namespace Smartest.Tests
         }
 
         [Test]
+        public void Art_EveryPieceIsDrawnAndFoundByName()
+        {
+            int pieces = 0;
+            foreach (var b in InkSprites.RenderCatalogue())
+            {
+                if (b.Name.StartsWith("art_"))
+                {
+                    pieces++;
+                    var px = b.Texture.GetPixels32();
+                    Assert.IsTrue(System.Array.Exists(px, c => c.a > 128), b.Name + " is empty"); // the glow is soft all over
+                    Assert.Greater(InkSprites.ArtSize(b.Name.Substring(4)).x, 0f, b.Name);
+                }
+                Object.DestroyImmediate(b.Texture);
+            }
+            Assert.Greater(pieces, 20);
+        }
+
+        [Test]
+        public void Art_TintedPieceIsWhiteWhereTheColourGoes()
+        {
+            foreach (var b in InkSprites.RenderCatalogue())
+            {
+                if (b.Name != "art_coin") { Object.DestroyImmediate(b.Texture); continue; }
+                var t = b.Texture;
+                Color star = t.GetPixel(t.width / 2, t.height / 2);
+                Color rim = t.GetPixel(t.width / 2, 8); // the rim straddles the edge: rows 4 to 12
+                Assert.Greater(star.r, 0.95f, "the star is where the coin's colour goes");
+                Assert.Greater(star.a, 0.95f);
+                Assert.Less(rim.r, 0.2f, "the rim stays ink");
+                Object.DestroyImmediate(t);
+            }
+        }
+
+        [Test]
         public void Box_IsWhiteInsideInkOnTheRimClearOutside()
         {
             foreach (var b in InkSprites.RenderCatalogue())

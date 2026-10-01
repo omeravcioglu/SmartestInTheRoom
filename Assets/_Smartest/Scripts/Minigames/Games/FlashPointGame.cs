@@ -85,6 +85,8 @@ namespace Smartest.Minigames
 
             if (!CanAct)
             {
+                // The rule card's demo, and only the demo: it would show someone watching the answer.
+                if (Demo) PlayDemo();
                 if (!_revealed && Elapsed > LastFlashEnds + 1.5f) Reveal();
                 return;
             }
@@ -92,7 +94,27 @@ namespace Smartest.Minigames
             // A click before its dot has even flashed isn't an answer yet.
             if (Elapsed < _flashAt[_clicked] || !KeyInput.MousePressed()) return;
             if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var local)) return;
+            Answer(local);
+        }
 
+        /// <summary>
+        /// The rule card's demo: once the flashing is over the hand goes about where each dot was,
+        /// close but not dead on (nobody remembers a spot to the pixel), and clicks a beat later.
+        /// </summary>
+        private void PlayDemo()
+        {
+            if (_clicked >= _spots.Length || Elapsed < LastFlashEnds + 0.35f) return;
+            var at = _spots[_clicked] + new Vector2(13f, -9f);
+            PointAt(at);
+            if (Elapsed < LastFlashEnds + 0.6f + _clicked * 0.45f) return;
+            TapAt(at);
+            Answer(at);
+        }
+
+        /// <summary>A click, the player's or the demo's: it answers the next dot.</summary>
+        private void Answer(Vector2 local)
+        {
+            if (!CanMove || _clicked >= _spots.Length) return;
             // Clicks answer the dots in the order they flashed.
             int i0 = _clicked;
             float error = Vector2.Distance(local, _spots[i0]);

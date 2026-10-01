@@ -35,9 +35,12 @@ namespace Smartest.Minigames
         private readonly List<Fish> _fish = new List<Fish>();
         private RectTransform _line;
         private RectTransform _hook;
+        /// <summary>Where the line ties on, from the point the hook catches with.</summary>
+        private static readonly Vector2 Eye = new Vector2(5.5f, 23f);
         private Vector2 _hookAt;
         private float _surfaceY, _bedY, _halfW;
         private int _need, _caught;
+        private float _onFor; // the demo: how long the hook has been on a gold fish
         private TMP_Text _label;
 
         protected override void Build()
@@ -88,16 +91,21 @@ namespace Smartest.Minigames
                     Right = RandomRange(0, 2) == 0,
                     Puffer = puffer[i]
                 };
-                var img = UiKit.Dot(world, (f.Puffer ? "Puffer" : "Fish") + i, FishR * 2f, new Vector2(-9999f, f.Y), f.Puffer ? Palette.Red : Palette.Accent);
+                // Drawn the size of what touches the hook: a fish is wide and flat, a puffer round.
+                var img = f.Puffer
+                    ? UiKit.Art(world, "Puffer" + i, "puffer", new Vector2(FishR, FishR) * (60f / 22f), new Vector2(-9999f, f.Y), Palette.Red)
+                    : UiKit.Art(world, "Fish" + i, "fish", new Vector2(FishR * 2.7f, FishR * 1.6f), new Vector2(-9999f, f.Y), Palette.Accent);
                 f.View = (RectTransform)img.transform;
                 f.Image = img;
-                if (!f.Puffer) f.View.localScale = new Vector3(1.35f, 0.8f, 1f); // fish-shaped
+                if (!f.Right) f.View.localScale = new Vector3(-1f, 1f, 1f); // the art faces right
                 _fish.Add(f);
             }
 
             _hookAt = new Vector2(0f, (top + bottom) * 0.5f);
             _line = UiKit.Line(world, "Line", new Vector2(0f, _surfaceY + 30f), _hookAt, 3f, Palette.Ink);
-            _hook = (RectTransform)UiKit.Dot(world, "Hook", HookR * 2f, _hookAt, Palette.Ink).transform;
+            var hook = UiKit.Art(world, "Hook", "hook", new Vector2(22f, 32f), _hookAt);
+            UiKit.PivotOn(hook, "hook", new Vector2(7.5f, 24f));
+            _hook = hook.rectTransform;
 
             Progress("CAUGHT", 0, _need);
             _label = UiKit.Label(Area, "Hint", "HOOK THE GOLD, CLICK TO REEL", 26f, Palette.TextDim,
@@ -124,7 +132,8 @@ namespace Smartest.Minigames
                         break;
                     }
             _hook.anchoredPosition = _hookAt;
-            UiKit.SetLine(_line, new Vector2(_hookAt.x, _surfaceY + 30f), _hookAt);
+            UiKit.SetLine(_line, new Vector2(_hookAt.x + Eye.x, _surfaceY + 30f), _hookAt + Eye);
+            if (Demo) PointAt(_hookAt); // the hook goes where the mouse is: the demo's hand is on it
 
             int onHook = -1;
             for (int i = 0; i < _fish.Count; i++)
@@ -136,6 +145,8 @@ namespace Smartest.Minigames
                     // Reeled up to the surface, then gone.
                     float u = (Elapsed - f.CaughtAt) / ReelTime;
                     f.View.anchoredPosition = new Vector2(f.CaughtX, Mathf.Lerp(f.Y, _surfaceY + 40f, u));
+                    // Hauled up by the mouth.
+                    f.View.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(0f, f.Right ? 70f : -70f, Mathf.Clamp01(u * 3f)));
                     if (u >= 1f) { f.Gone = true; f.View.gameObject.SetActive(false); }
                     _fish[i] = f;
                     continue;
@@ -158,9 +169,16 @@ namespace Smartest.Minigames
                 if (touching && !f.Puffer) onHook = i;
             }
 
-            bool reel = CanAct ? KeyInput.MousePressed() : (!Interactive && onHook >= 0);
+            // The rule card's demo lets the hook settle on the fish a moment, then clicks.
+            if (Demo) _onFor = onHook >= 0 ? _onFor + dt : 0f;
+            bool reel = CanAct ? KeyInput.MousePressed() : (!Interactive && onHook >= 0 && (!Demo || _onFor >= 0.25f));
             if (reel && onHook >= 0)
             {
+                if (Demo)
+                {
+                    TapAt(_hookAt);
+                    _onFor = -0.15f; // and a beat longer before the next click
+                }
                 var f = _fish[onHook];
                 f.Caught = true;
                 f.CaughtAt = Elapsed;
@@ -170,7 +188,7 @@ namespace Smartest.Minigames
                 _fish[onHook] = f;
                 _caught++;
                 Progress("CAUGHT", _caught, _need);
-                if (_caught >= _need && CanAct)
+                if (_caught >= _need && CanMove)
                 {
                     _label.text = "WHAT A CATCH";
                     _label.color = Palette.Green;

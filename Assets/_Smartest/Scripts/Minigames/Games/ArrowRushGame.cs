@@ -14,6 +14,7 @@ namespace Smartest.Minigames
         // ► and ◄ rather than ▶ and ◀: LiberationSans has no glyph for the latter two, so
         // RIGHT and LEFT both rendered as the same empty box.
         private static readonly string[] Glyphs = { string.Empty, "▲", "►", "▼", "◄" };
+        private static readonly string[] Keys = { string.Empty, "W", "D", "S", "A" };
 
         private int[] _dirs;      // 1 up, 2 right, 3 down, 4 left
         private bool[] _gold;
@@ -71,12 +72,15 @@ namespace Smartest.Minigames
         protected override void OnTick(float dt)
         {
             if (Elapsed > 10f) { Fail("TOO SLOW"); return; }
-            if (!CanAct || _index >= _dirs.Length) return;
-
-            int key = KeyInput.DirectionPressed();
-            if (key == 0) return;
+            if (!CanMove || _index >= _dirs.Length) return;
 
             int want = _gold[_index] ? Opposite(_dirs[_index]) : _dirs[_index];
+            // The rule card's demo (never a spectator: it gives the answers away) reads the row,
+            // then keys it in at a steady clip.
+            int key = CanAct ? KeyInput.DirectionPressed() : (Elapsed >= 0.8f + _index * 0.45f ? want : 0);
+            if (key == 0) return;
+            if (Demo) PressKey(Keys[key]);
+
             if (key != want) { Fail("WRONG WAY"); return; }
 
             _index++;

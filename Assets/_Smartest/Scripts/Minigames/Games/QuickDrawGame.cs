@@ -33,6 +33,7 @@ namespace Smartest.Minigames
         private int _hits;
         private RectTransform _target;
         private Image _targetImage;
+        private GameObject _holdFire;
         private TMP_Text _label;
 
         protected override void Build()
@@ -73,8 +74,10 @@ namespace Smartest.Minigames
                     Red = redAt[i]
                 };
 
-            _targetImage = UiKit.Dot(Area, "Target", _r * 2f, Vector2.zero, Palette.Accent);
+            _targetImage = UiKit.Art(Area, "Target", "target", new Vector2(_r * 2f, _r * 2f), Vector2.zero, Palette.Accent);
             _target = (RectTransform)_targetImage.transform;
+            // A red one is crossed out too, so it isn't told from gold by colour alone.
+            _holdFire = UiKit.Marker(_target, "HoldFire", UiKit.Mark.Cross, _r * 1.5f, Vector2.zero, Palette.OnRed).gameObject;
             _target.gameObject.SetActive(false);
             _appearAt = _draws[0].Delay;
             _label = UiKit.Label(Area, "Hint", "WAIT FOR IT", 26f, Palette.TextDim,
@@ -103,6 +106,7 @@ namespace Smartest.Minigames
                 _shownAt = Elapsed;
                 _target.anchoredPosition = d.Pos;
                 _targetImage.color = d.Red ? Palette.Red : Palette.Accent;
+                _holdFire.SetActive(d.Red);
                 _target.gameObject.SetActive(true);
                 _label.text = d.Red ? "HOLD YOUR FIRE" : "DRAW!";
             }
@@ -110,6 +114,7 @@ namespace Smartest.Minigames
 
             if (!CanAct)
             {
+                if (Demo) { PlayDemo(d); return; }
                 // Someone watching sees each gold one taken after a fair reaction.
                 if (_showing && !d.Red && Elapsed - _shownAt >= 0.35f) Next();
                 return;
@@ -120,7 +125,31 @@ namespace Smartest.Minigames
             if (!_showing) { Fail("TOO EARLY"); return; }
             if (d.Red) { Fail("SHOT THE RED ONE"); return; }
             if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var click)) return;
-            if (Vector2.Distance(click, d.Pos) > _r + 8f) return; // a miss: fire again
+            Hit(click);
+        }
+
+        /// <summary>
+        /// The rule card's demo: the hand waits, still, then goes for each gold target as it shows
+        /// and clicks it a beat later. A red one it leaves alone.
+        /// </summary>
+        private void PlayDemo(Draw d)
+        {
+            if (!_showing || d.Red)
+            {
+                if (!DemoHand.Shown) PointAt(Vector2.zero);
+                return;
+            }
+            if (Elapsed - _shownAt >= 0.05f) PointAt(d.Pos);
+            if (Elapsed - _shownAt < 0.3f) return;
+            TapAt(d.Pos);
+            Hit(d.Pos);
+        }
+
+        /// <summary>A shot at the gold target showing, the player's or the demo's.</summary>
+        private void Hit(Vector2 click)
+        {
+            if (!CanMove || !_showing || _draws[_index].Red) return;
+            if (Vector2.Distance(click, _draws[_index].Pos) > _r + 8f) return; // a miss: fire again
 
             _reactionSum += Elapsed - _shownAt;
             Progress("HIT", ++_hits, _golds);

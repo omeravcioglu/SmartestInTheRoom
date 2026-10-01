@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Smartest.Core;
 using Smartest.UI;
@@ -27,6 +28,10 @@ namespace Smartest.Minigames
         [SerializeField] private TMP_Text howItWorks;
         [SerializeField] private RectTransform fuseFill;
         [SerializeField] private RectTransform fuseSpark;
+        [SerializeField] private RectTransform demoArea;
+        [SerializeField] private RectTransform demoHand;
+        [SerializeField] private Image demoSplash;
+        [SerializeField] private TMP_Text demoKey;
 
         [Header("Level")]
         [SerializeField] private GameObject levelGroup;
@@ -70,6 +75,8 @@ namespace Smartest.Minigames
         private const float PanelHeight = 602f;
 
         private MinigameView _view;
+        private MinigameView _demo;
+        private MinigameEntry _demoGame;
         private MinigameEntry _entry;
         private CanvasGroup _contentGroup;
         private float _startIn;
@@ -79,9 +86,24 @@ namespace Smartest.Minigames
         private bool _armed;
         private bool _playing;
 
+        // The rule card's demo: level 1 of the game, playing itself on a loop.
+        private const int DemoSeed = 0x5EED; // never the match's seed, so the demo never previews the real level
+        private const float DemoLongest = 12f; // only a run that never ends starts over; the card is up for 8 s
+        private const float DemoPause = 1.2f; // the finished run stays up this long before the next, long enough to read how it went
+        private const float SplashFor = 0.35f;
+        private const float KeyFor = 0.5f;
+        private float _demoAge;
+        private float _demoDoneAt = -1f;
+        private int _demoRun;
+        private float _splash;
+        private float _keyFlash;
+        private Color _capColour = Palette.Ink; // a keycap's own colour, which a pressed key flashes gold from
+
         protected override void Awake()
         {
             base.Awake();
+            // Read off the demo's key before it ever flashes: Ink.Key made it, like the controls row's caps.
+            if (demoKey != null && Ink.BoxOf(demoKey).TryGetComponent(out Image keyCap)) _capColour = keyCap.color;
             if (contentArea != null && !contentArea.TryGetComponent(out _contentGroup))
                 _contentGroup = contentArea.gameObject.AddComponent<CanvasGroup>();
             ShowLeadIn(false);
@@ -125,6 +147,8 @@ namespace Smartest.Minigames
             BuildControls(introControls, entry != null ? entry.Controls : string.Empty, 28f, true);
             BuildPrizes(players);
             SetFuse(1f);
+            // The card gets refreshed as the round's details arrive; the same game's demo plays on.
+            if (_demo == null || _demoGame != entry) StartDemo();
         }
 
         /// <summary>The fuse under the rule card burns down with the intro.</summary>
@@ -165,29 +189,15 @@ namespace Smartest.Minigames
                 howItWorks.text = "Fail and you're out. Nobody fails? The worst score goes. Everyone fails? Again — harder. <b>Last one standing wins.</b>";
         }
 
+        /// <summary>One prize in the row: the place, then its points on a chip.</summary>
         private void PrizeRow(string place, int points)
         {
-            var row = Ink.Row(prizeRows, "Prize", 14f, TextAnchor.MiddleLeft, hug: false);
-            Ink.Size(row, 638f, 56f);
-            var word = Ink.Text(row, "Place", place, TypeRole.Display, 52f, Palette.Ink, TextAlignmentOptions.MidlineLeft,
+            var cell = Ink.Row(prizeRows, "Prize", 8f, TextAnchor.MiddleLeft);
+            var word = Ink.Text(cell, "Place", place, TypeRole.Display, 34f, Palette.Ink, TextAlignmentOptions.MidlineLeft,
                 caps: true, lineHeight: 1f).OneLine();
-            var wordSize = Ink.Size(word, -1f, 56f);
-            wordSize.minWidth = 110f; // short places line up; long ones push the dots along
-            // A dotted leader between the place and its points, like a results table.
-            var leader = Ink.Node(row, "Leader");
-            Ink.Size(leader, -1f, 8f).flexibleWidth = 1f;
-            var dots = Ink.Icon(leader, "Dots", InkSprites.Dots, Palette.Ink);
-            dots.preserveAspect = false;
-            dots.type = Image.Type.Tiled;
-            dots.rectTransform.anchorMin = new Vector2(0f, 0f);
-            dots.rectTransform.anchorMax = new Vector2(1f, 0f);
-            dots.rectTransform.pivot = new Vector2(0.5f, 0f);
-            dots.rectTransform.sizeDelta = new Vector2(0f, 4f);
-            dots.rectTransform.anchoredPosition = Vector2.zero;
-            var chip = Ink.Chip(row, "Points", SeatCard.Format(points), TypeRole.Sticker, 30f, Palette.DeltaFill(points),
-                Palette.DeltaText(points), 3f, new RectOffset(12, 12, 4, 2));
-            Ink.Unhug(Ink.BoxOf(chip));
-            Ink.Size(Ink.BoxOf(chip), 96f, -1f);
+            Ink.Size(word, -1f, 44f);
+            Ink.Chip(cell, "Points", SeatCard.Format(points), TypeRole.Sticker, 22f, Palette.DeltaFill(points),
+                Palette.DeltaText(points), 3f, new RectOffset(10, 10, 3, 2));
         }
 
         // ------------------------------------------------------------------
@@ -203,6 +213,7 @@ namespace Smartest.Minigames
             float startIn, float levelSeconds, bool tieBreak, bool stillIn = false)
         {
             if (entry == null) return;
+            StopDemo();
             _entry = entry;
             _playing = playing;
             _startIn = Mathf.Max(0f, startIn);
@@ -405,6 +416,7 @@ namespace Smartest.Minigames
         public void EndMinigame()
         {
             _armed = false;
+            StopDemo();
             DestroyView();
             SetContentVisible(true);
             ShowLeadIn(false);
@@ -415,8 +427,25 @@ namespace Smartest.Minigames
 
         // ------------------------------------------------------------------
 
+        /// <summary>A 1200 × 520 layer like the real game panel's, shrunk into the demo screen.</summary>
+        private static RectTransform DemoLayer(Transform parent, string name, float scale)
+        {
+            var rt = Ink.Node(parent, name);
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(1200f, 520f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.localScale = Vector3.one * scale;
+            // A demo isn't for clicking: its cells and buttons ignore the real mouse.
+            var group = rt.gameObject.AddComponent<CanvasGroup>();
+            group.blocksRaycasts = false;
+            group.interactable = false;
+            return rt;
+        }
+
         private void Update()
         {
+            UpdateDemo(Time.unscaledDeltaTime);
             if (!_armed) return;
 
             // Lead-in: the same "3, 2, 1" on every machine, ending at the same instant.
@@ -451,6 +480,194 @@ namespace Smartest.Minigames
                 _armed = false;
                 if (_view != null && !_view.IsDone) _view.TimeOut();
             }
+        }
+
+        protected override void OnHidden() => StopDemo();
+
+        private void OnDisable() => StopDemo();
+
+        // ------------------------------------------------------------------
+        // The rule card's demo
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Level 1 of the game being introduced, played by the game itself on the rule card with
+        /// its sounds off, so everyone sees what to do before their own level starts. Its hand
+        /// and keys show the moves. Nothing it does is reported to anyone.
+        /// </summary>
+        private void StartDemo()
+        {
+            StopDemo();
+            if (_entry == null || _entry.ViewType == null || demoArea == null) return;
+            _demoGame = _entry;
+            _demoRun = 0;
+            RunDemo();
+        }
+
+        /// <summary>
+        /// One run of the demo, on a fresh view every time, the way every real level gets one:
+        /// games keep state in fields their Build doesn't reset (a sequence, the pieces it made).
+        /// </summary>
+        private void RunDemo()
+        {
+            if (_demoGame == null || demoArea == null) return;
+            DropDemoView();
+            // Beside the demo's area, not in it: a run clears the area.
+            var go = new GameObject("Demo", typeof(RectTransform));
+            ((RectTransform)go.transform).SetParent(transform, false);
+            _demo = go.AddComponent(_demoGame.ViewType) as MinigameView;
+            if (_demo == null)
+            {
+                Destroy(go);
+                return;
+            }
+            _demo.Demo = true;
+            _demo.Init(demoArea);
+            _demo.DemoTapped += OnDemoTap;
+            _demo.DemoKeyPressed += OnDemoKey;
+            int level = _demo.DemoLevel;
+            _demo.Prepare(level, LevelRng.For(_demoGame.Id, DemoSeed + _demoRun, level), _demoGame.LevelSeconds, false);
+            _demo.Begin();
+            _demoRun++;
+            _demoAge = 0f;
+            _demoDoneAt = -1f;
+            _splash = 0f;
+            _keyFlash = 0f;
+            if (demoHand != null) demoHand.gameObject.SetActive(false);
+            if (demoSplash != null) demoSplash.gameObject.SetActive(false);
+            if (demoKey != null) Ink.BoxOf(demoKey).gameObject.SetActive(false);
+        }
+
+        private void DropDemoView()
+        {
+            if (_demo == null) return;
+            _demo.DemoTapped -= OnDemoTap;
+            _demo.DemoKeyPressed -= OnDemoKey;
+            _demo.Teardown();
+            Destroy(_demo.gameObject);
+            _demo = null;
+        }
+
+        private void StopDemo()
+        {
+            DropDemoView();
+            _demoGame = null;
+            if (demoArea != null) UiKit.Clear(demoArea);
+            if (demoHand != null) demoHand.gameObject.SetActive(false);
+            if (demoSplash != null) demoSplash.gameObject.SetActive(false);
+            if (demoKey != null) Ink.BoxOf(demoKey).gameObject.SetActive(false);
+        }
+
+        private void UpdateDemo(float dt)
+        {
+            if (_demo == null) return;
+            if (introGroup != null && !introGroup.activeInHierarchy) { StopDemo(); return; }
+
+            _demoAge += dt;
+            if (_demoDoneAt < 0f && (_demo.IsDone || _demoAge > DemoLongest)) _demoDoneAt = _demoAge;
+            if (_demoDoneAt >= 0f && _demoAge - _demoDoneAt > DemoPause)
+            {
+                RunDemo();
+                return;
+            }
+
+            // The hand glides to where the game says it is, and dips while its button is down.
+            var hand = _demo.DemoHand;
+            if (demoHand != null)
+            {
+                bool was = demoHand.gameObject.activeSelf;
+                demoHand.gameObject.SetActive(hand.Shown);
+                if (hand.Shown)
+                {
+                    demoHand.anchoredPosition = was
+                        ? Vector2.Lerp(demoHand.anchoredPosition, hand.At, 1f - Mathf.Exp(-28f * dt))
+                        : hand.At;
+                    demoHand.localScale = Vector3.one * (hand.Down ? 0.86f : 1f);
+                }
+            }
+
+            // A click splashes under the tip; a held button keeps a dot there.
+            if (demoSplash != null)
+            {
+                var rt = demoSplash.rectTransform;
+                var gold = Palette.Gold;
+                if (_splash > 0f)
+                {
+                    _splash -= dt;
+                    float k = 1f - Mathf.Clamp01(_splash / SplashFor);
+                    demoSplash.gameObject.SetActive(true);
+                    rt.localScale = Vector3.one * Mathf.Lerp(0.35f, 1.3f, k);
+                    demoSplash.color = new Color(gold.r, gold.g, gold.b, 0.85f * (1f - k));
+                }
+                else if (hand.Shown && hand.Down)
+                {
+                    demoSplash.gameObject.SetActive(true);
+                    rt.anchoredPosition = demoHand != null ? demoHand.anchoredPosition : hand.At;
+                    rt.localScale = Vector3.one * 0.55f;
+                    demoSplash.color = new Color(gold.r, gold.g, gold.b, 0.7f);
+                }
+                else demoSplash.gameObject.SetActive(false);
+            }
+
+            // A key pops up under the picture, then goes.
+            if (demoKey != null && _keyFlash > 0f)
+            {
+                _keyFlash -= dt;
+                var box = Ink.BoxOf(demoKey);
+                float k = 1f - Mathf.Clamp01(_keyFlash / KeyFor);
+                box.localScale = Vector3.one * Mathf.Lerp(1.25f, 1f, Mathf.Clamp01(k * 3f));
+                var cap = box.GetComponent<Image>();
+                if (cap != null) cap.color = k < 0.5f ? Palette.Gold : _capColour;
+                if (_keyFlash <= 0f) box.gameObject.SetActive(false);
+            }
+        }
+
+        private void OnDemoTap(Vector2 at)
+        {
+            if (demoHand != null)
+            {
+                demoHand.gameObject.SetActive(true);
+                demoHand.anchoredPosition = at;
+            }
+            if (demoSplash != null)
+            {
+                demoSplash.rectTransform.anchoredPosition = at;
+                _splash = SplashFor;
+            }
+        }
+
+        private void OnDemoKey(string key)
+        {
+            if (demoKey == null || string.IsNullOrEmpty(key)) return;
+            demoKey.text = key.ToUpperInvariant();
+            Ink.BoxOf(demoKey).gameObject.SetActive(true);
+            _keyFlash = KeyFor;
+            PressCap(introControls, key);
+        }
+
+        /// <summary>The matching keycap in the rule card's controls row dips, the way a key does.</summary>
+        private void PressCap(RectTransform row, string key)
+        {
+            if (row == null || !isActiveAndEnabled) return;
+            foreach (var t in row.GetComponentsInChildren<TMP_Text>())
+            {
+                if (!string.Equals(t.text, key, StringComparison.OrdinalIgnoreCase)) continue;
+                StartCoroutine(Dip(Ink.BoxOf(t), _capColour));
+                return;
+            }
+        }
+
+        private static IEnumerator Dip(RectTransform cap, Color colour)
+        {
+            if (cap == null) yield break;
+            var img = cap.GetComponent<Image>();
+            if (img != null) img.color = Palette.Gold;
+            cap.localScale = new Vector3(1f, 0.88f, 1f);
+            float t = 0f;
+            while (t < 0.18f) { t += Time.unscaledDeltaTime; yield return null; }
+            if (cap == null) yield break;
+            cap.localScale = Vector3.one;
+            if (img != null) img.color = colour;
         }
 
         private void OnViewFinished(bool failed, int metric)
@@ -578,11 +795,11 @@ namespace Smartest.Minigames
             Ink.BoxOf(kick).Pin(0f, 8f, new Vector2(0f, 1f));
 
             introTitle = Ink.Headline(g, "Title", "Memory Boxes", 190f, 8f, 80f).OneLine();
-            introTitle.rectTransform.At(0f, 70f, 1080f, 170f);
+            introTitle.rectTransform.At(0f, 70f, 1000f, 170f);
             introPrompt = Ink.Text(g, "Prompt", "Remember the lit boxes.", TypeRole.Body, 36f, Palette.Ink,
                 TextAlignmentOptions.TopLeft).OneLine();
             introPrompt.fontStyle |= FontStyles.Italic | FontStyles.Bold;
-            introPrompt.rectTransform.At(0f, 246f, 1080f, 50f);
+            introPrompt.rectTransform.At(0f, 246f, 1000f, 50f);
             introPrompt.Fit(24f);
 
             var deal = Ink.Box(g, "Deal", Palette.PaperHi, 4f);
@@ -595,7 +812,7 @@ namespace Smartest.Minigames
             stack.childForceExpandWidth = stack.childForceExpandHeight = false;
             var fit = deal.gameObject.AddComponent<ContentSizeFitter>();
             fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            deal.rectTransform.sizeDelta = new Vector2(1040f, 150f);
+            deal.rectTransform.sizeDelta = new Vector2(990f, 150f);
             Ink.Label(deal.transform, "Heading", "THE DEAL", 14f);
             introDeal = Ink.Text(deal.transform, "Rule", "", TypeRole.Body, 30f, Palette.Ink, TextAlignmentOptions.TopLeft,
                 lineHeight: 1.45f);
@@ -605,25 +822,51 @@ namespace Smartest.Minigames
             introControls = Ink.Row(g, "Controls", 16f);
             introControls.Pin(0f, 505f, new Vector2(0f, 0.5f));
 
-            // The prizes.
+            // How to play: the game's own level 1 playing itself, a hand showing the moves.
+            // The level is shrunk with a margin round it: games put their bottom line close to
+            // the panel's edge, and the screen's mask would cut it off.
+            const float demoWidth = 774f, demoScale = (demoWidth - 28f) / 1200f, demoHeight = 520f * demoScale + 22f;
+            var screen = Ink.Box(g, "DemoScreen", Palette.PaperHi, 4f);
+            Ink.Shadow(screen, 10f);
+            screen.rectTransform.At(1040f, 20f, demoWidth + 8f, demoHeight + 8f);
+            var demoClip = Ink.Node(screen.transform, "Clip");
+            demoClip.Fill(4f, 4f, 4f, 4f);
+            demoClip.gameObject.AddComponent<RectMask2D>();
+            demoArea = DemoLayer(demoClip, "Demo", demoScale);
+            var overlay = DemoLayer(demoClip, "Overlay", demoScale);
+            demoSplash = UiKit.Dot(overlay, "Splash", 96f, Vector2.zero, Palette.Gold);
+            demoSplash.gameObject.SetActive(false);
+            var hand = UiKit.Art(overlay, "Hand", "cursor", new Vector2(40f, 56f) * 1.7f, Vector2.zero);
+            UiKit.PivotOn(hand, "cursor", new Vector2(4f, 4f));
+            demoHand = hand.rectTransform;
+            demoHand.gameObject.SetActive(false);
+            // In the corner, where a key overlay goes: the middle of the bottom is where games say how it went.
+            demoKey = Ink.Key(screen.transform, "Key", "SPACE", 30f);
+            Ink.BoxOf(demoKey).Pin(demoWidth + 8f - 22f, demoHeight - 34f, new Vector2(1f, 0.5f));
+            Ink.BoxOf(demoKey).gameObject.SetActive(false);
+            var tab = Ink.Chip(g, "DemoTab", "HOW TO PLAY", TypeRole.Sticker, 20f, Palette.Ink, Palette.Gold, 0f,
+                new RectOffset(14, 14, 6, 4), caps: true, tracking: 0.1f);
+            Ink.BoxOf(tab).Pin(1040f + 28f, 20f, new Vector2(0f, 0.5f));
+            Ink.BoxOf(tab).Tilt(-1.5f);
+
+            // The prizes, one row of them, and how a minigame plays out.
             var prizes = Ink.Box(g, "Prizes", Palette.PaperHi, 4f);
             Ink.Shadow(prizes, 10f);
-            prizes.rectTransform.Pin(1120f, 26f, new Vector2(0f, 1f));
-            prizes.rectTransform.sizeDelta = new Vector2(694f, 400f);
+            prizes.rectTransform.Pin(1040f, 384f, new Vector2(0f, 1f));
+            prizes.rectTransform.sizeDelta = new Vector2(demoWidth + 8f, 170f);
             var pStack = prizes.gameObject.AddComponent<VerticalLayoutGroup>();
-            pStack.padding = new RectOffset(28, 28, 22, 26);
-            pStack.spacing = 10f;
+            pStack.padding = new RectOffset(22, 22, 12, 14);
+            pStack.spacing = 6f;
             pStack.childControlWidth = pStack.childControlHeight = true;
             pStack.childForceExpandWidth = pStack.childForceExpandHeight = false;
             var pFit = prizes.gameObject.AddComponent<ContentSizeFitter>();
             pFit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            RoundPanel.DealHeading(prizes.transform, "THE PRIZES");
-            prizeRows = Ink.Column(prizes.transform, "Rows", 10f, TextAnchor.UpperLeft, hug: false);
-            var rule = Ink.Plain(prizes.transform, "Rule", Palette.Ink);
-            Ink.Size(rule, 638f, 3f);
-            Ink.Label(prizes.transform, "How", "HOW IT WORKS", 15f);
-            howItWorks = Ink.Text(prizes.transform, "HowText", "", TypeRole.Body, 22f, Palette.Ink,
-                TextAlignmentOptions.TopLeft, lineHeight: 1.5f);
+            Ink.Label(prizes.transform, "Heading", "THE PRIZES", 14f);
+            prizeRows = Ink.Row(prizes.transform, "Rows", 26f, TextAnchor.MiddleLeft, hug: false);
+            Ink.Size(prizeRows, -1f, 44f);
+            Ink.Label(prizes.transform, "How", "HOW IT WORKS", 14f);
+            howItWorks = Ink.Text(prizes.transform, "HowText", "", TypeRole.Body, 19f, Palette.Ink,
+                TextAlignmentOptions.TopLeft, lineHeight: 1.35f);
             howItWorks.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
             // The fuse.
@@ -716,9 +959,11 @@ namespace Smartest.Minigames
             Ink.BoxOf(leadInLabel).Tilt(3f);
             Ink.BoxOf(leadInLabel).Pin(653f - 4f, 510f - 4f, new Vector2(0.5f, 0.5f));
 
-            // Finished-early stamp.
+            // Finished-early stamp, at the top between the scoreline tabs: the bottom line is
+            // where every game says why the level ended for you ("TOO SLOW"), and the stamp
+            // used to land right on it.
             statusStamp = Ink.Stamp(clip, "Status", "DONE — WAITING", 30f, -4f, 4f, Palette.Ink, Palette.PaperHi);
-            Ink.BoxOf(statusStamp).Pin((PanelWidth - 8f) * 0.5f, PanelHeight - 60f, new Vector2(0.5f, 0.5f));
+            Ink.BoxOf(statusStamp).Pin((PanelWidth - 8f) * 0.5f, 62f, new Vector2(0.5f, 0.5f));
 
             // Level banner, over the frozen level.
             var ban = Ink.Plain(clip, "Banner", Palette.Ink);

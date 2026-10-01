@@ -126,9 +126,11 @@ namespace Smartest.Minigames
         {
             if (_index >= _answer.Length) return;
             if (Elapsed - _promptStart > _perPrompt) { Fail("TOO SLOW"); return; }
-            if (!CanAct) return;
 
-            int key = KeyInput.DigitPressed();
+            // The rule card's demo (never a spectator: it gives the answers away) works out both
+            // sides, then answers.
+            int key = CanAct ? KeyInput.DigitPressed()
+                : (Demo && Elapsed - _promptStart >= 1.2f && DemoAnswer(_answer[_index].ToString()) ? _answer[_index] : 0);
             if (key != 1 && key != 2) return;
             if (key != _answer[_index]) { Fail("WRONG"); return; }
 

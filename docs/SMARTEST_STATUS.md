@@ -83,6 +83,22 @@ clock is Netcode server time, so "GO" lands on the same instant everywhere.
 `MinigameSmokeTests` (PlayMode) then plays levels 1–12 of it, as a player and as a spectator,
 and fails if any level throws or never ends.
 
+**Give it a demo.** The rule card plays level 1 of the game by itself (`Demo` is true,
+`Interactive` false) with a hand showing the moves, and `EveryMinigameDemoShowsAMoveAndWins`
+fails a game whose demo shows nothing in its first 7 s, or loses. In the not-Interactive path,
+play the level the way a good player would through the same methods the input drives (guard
+those with `CanMove`, keep reading the mouse and keys under `CanAct`), and report the moves:
+`PointAt`, `HoldAt`, `TapAt`, `PressKey` (`DemoAnswer` for a key that answers a question), with
+`Where(piece)` for positions. Show the input the
+rule text names (a click when it says click). Anything that would solve the level for a
+knocked-out player watching it (a sequence, the odd one out) goes behind `Demo`. If level 1
+hides what the game is about, override `DemoLevel`. See *How-to-play demos* below.
+
+Drawing it: the kit's boxes, dots and cells for anything abstract; for something a player
+would recognise (a cup, a fish, a mole) add a piece to `Scripts/UI/Kit/InkArt.Pieces.cs` (one
+shape per line, canvas pixels, y down) and place it with `UiKit.Art`. Build Scenes bakes it.
+Report progress with `Progress(...)` / `Tries(...)` and the stage shows the scoreline tabs.
+
 The deck, ladder, HUD, level-result beat, ranking screen, payout and tests pick it up
 automatically. `GameState`, `GameUI`, `RoundDeck` and `SceneBuilder` are not touched.
 
@@ -104,7 +120,7 @@ plus the existing round timings and `targetScore`.
 3. **Tools ▸ Smartest ▸ Build Scenes** — keeps every generated file in step with the code (the
    89 challenge assets, prefabs and both scenes). A new minigame is only dealt once this has
    made its asset (last run 29 Sep, after the 15 new ones).
-4. **Window ▸ General ▸ Test Runner** — EditMode ▸ Run All (159) and PlayMode ▸ Run All.
+4. **Window ▸ General ▸ Test Runner** — EditMode ▸ Run All (161) and PlayMode ▸ Run All.
 5. Play from `Menu.unity`. Two instances (or two PCs) to see a real elimination.
 6. To ship: **Tools ▸ Smartest ▸ Build Windows Release** (see *Publishing* below).
 
@@ -140,38 +156,125 @@ record from Tools ▸ Smartest ▸ Voice Studio ▸ Record missing, or without o
 `-executeMethod Smartest.EditorTools.ReleaseBuilder.BuildWindowsBatch -quit`) checks the project
 first and refuses to build if: the build scenes aren't exactly Menu then Game, a registered
 minigame has no round asset (run Build Scenes), or a font licence file is missing. It warns
-about a default company name and unrecorded voice lines. Then it builds a non-development
+about a default company name, a missing app icon and unrecorded voice lines. Then it builds a non-development
 player into a new folder, `Build/Release/SmartestInTheRoom-<version>-win64/` (never over an
 older one), moves Burst's debug symbols out to `Build/Release/_symbols/`, and writes a README.
 Every standalone build, this one or File ▸ Build, gets a `Licenses/` folder with the four SIL
 OFL texts (Archivo, Atkinson Hyperlegible Next and Mono, Liberation Sans), which the font
 licence asks for.
 
-**Release candidate, 29 Sep:** `Build/Release/SmartestInTheRoom-0.1.0-win64/` (116.5 MB, Mono,
-all 69 minigames). It launches cleanly; nobody has played it on two machines yet, which is what
-it's for. An earlier build from the same evening is under `Build/Release/_superseded/`, and the old
-dev build is still loose in `Build/`. It predates the HUD and art pass on the 49 newer minigames
-(started later the same evening): once that has landed and Build Scenes has run, build again.
+**Release candidate, 1 Oct:** `Build/Release/SmartestInTheRoom-0.1.0-win64/` (119.0 MB, Mono,
+all 69 minigames with the scoreline tabs and the illustrated art, the app icon). It launches
+cleanly; it still hasn't been played across two PCs, which is what it's for. Older candidates are under
+`Build/Release/_superseded/`, and the old dev build is still loose in `Build/`.
 
-Done 29 Sep: product name "Smartest in the Room" (it was "SmartestInTheRoom"); the template's
-`SampleScene` taken out of the build, and Build Scenes no longer keeps scenes from outside
-`_Smartest`; the front page no longer advertises question rounds while they're off (a
-Minigames box and a Knockout box instead).
+Checked 1 Oct, on the real project: EditMode 159/159; PlayMode MatchFlowTests and
+MinigameSmokeTests (all 69 games, levels 1-12, as player and spectator); the full ScreenshotTour
+(82 screens, every game looked at); and **online hosting**: the explicit `OnlineHostingCheck`
+test signs in to Unity Services and opens a real private Relay lobby, which got a join code. So
+the project is linked and Relay and the session service are on; online play needs nothing more
+in the Unity Cloud dashboard. Run that test again before each release.
+
+Done 29 Sep - 1 Oct:
+- Product name "Smartest in the Room" (it was "SmartestInTheRoom"); the template's `SampleScene`
+  out of the build, and Build Scenes no longer keeps scenes from outside `_Smartest`; the front
+  page no longer advertises question rounds while they're off (Minigames and Knockout boxes).
+- **VSync on** for the PC quality level. Standalone builds had VSync off and no frame cap, so the
+  menus ran the GPU flat out.
+- **An app icon**: `Art/AppIcon.png`, a gold sticker with an ink S and the leader's star, set with
+  Tools ▸ Smartest ▸ Use App Icon. A placeholder in the game's style; swap the PNG and run the
+  menu item again. The release check warns if there's no icon.
+- **The finished stamp** ("OUT", "DONE — WAITING") moved to the top of the game panel. It used to
+  sit on the line where every game says why the level ended for you ("TOO SLOW") and hid it.
+- **Store screenshots** in `Steam/Screenshots/` (12 at 1920 × 1080, 4K masters, alternatives),
+  made by the explicit `SteamShots` test after the art pass; see the README there. The release
+  candidate above was rebuilt after the art pass too.
 
 Still open before a public release:
-- **Two machines.** Nothing has been played across two PCs yet; only the solo host loop is
-  tested. Play a full match with 3–4 people, over Relay and over LAN.
-- **Unity Cloud.** Relay/Lobby must be enabled for this project in the Unity Cloud dashboard,
-  and the project linked, or online hosting fails (LAN and same-PC modes don't need it).
+- **Rebuild the release candidate** with the how-to-play demos (below): Build Scenes bakes the
+  new rule card into the Game scene, then Build Windows Release. The 1 Oct candidate predates them.
+- **Two machines.** Play a full match with 3–4 people on the release candidate, over Relay and
+  over LAN. Hosting online is proven; a full match between PCs isn't yet.
 - **Company name** (Player settings; still DefaultCompany) and a **version number** for the
   release (0.1.0 now).
 - **ElevenLabs licence.** A paid ElevenLabs plan is what allows commercial use of the voice.
-  Check the plan the clips were made on before selling the game.
-- **Icon and store art.** The build uses Unity's default icon; Steam and itch.io need a capsule
-  image and screenshots.
-- **Playtest tuning** of the new games' ramps, and a design pass on anything that isn't fun.
+  Check the plan the clips were made on before selling the game. 15 intros are unrecorded.
+- **Store art.** Screenshots and an icon exist; Steam also needs the capsule images (header
+  920 × 430, small 462 × 174, main 1232 × 706, vertical 748 × 896) and the library images.
+- **Playtest tuning** of the ramps, and a design pass on anything that isn't fun.
 - **Version control.** The project isn't in git; put it in before release so a build can be
   traced to its code.
+
+## How-to-play demos — 1 Oct 2026
+
+Playtesters said the games start before anyone understands them: the rule card was up for 2.5 s.
+It's now up for 8 s (`minigameIntroSeconds`), and its right half is a **HOW TO PLAY** screen:
+the game's own level 1, scaled down, playing itself on a loop, with a mouse pointer that glides,
+clicks (a gold splash) and holds (a gold dot), and keys that pop up in the screen's corner while
+the matching keycap in the controls row dips. The title, rule and controls stay on the left; the
+prizes became one row of chips under the demo.
+
+How it works:
+- `MinigameView` has `Demo`, set before `Prepare`. A demo is never Interactive, its sounds are
+  hushed (`Sounds.Hush`), and nothing it does reaches the host. Games report their moves with
+  `PointAt` / `HoldAt` / `TapAt` / `PressKey` (`DemoHand`, `DemoTapped`, `DemoKeyPressed`), and
+  shared action methods use `CanMove` (CanAct, or a demo) while input reading stays on `CanAct`.
+  A quiz answers with `DemoAnswer`, which shows the key 0.45 s before the game takes it, so the
+  key pops up beside the question it answers, not the next one. A demo never steps more than
+  50 ms at once: after a slow frame it runs slow instead of missing its cue.
+- `MinigameStage` builds a fresh view for every run of the demo, seeded `0x5EED + run` (never
+  the match's seed, so the demo never previews the real level), lets a run play out, holds the
+  finished picture 1.2 s and starts the next; the demo screen ignores real clicks.
+- Every game's demo plays its level the way a good player would and wins it: Simon and Echo
+  play the sequence back, Herd's pointer is the dog, Maze finds the way out with a search over
+  the walls, Slice swings a real blade through the oranges, Penalty feints the keeper, Pop the
+  Lock clicks on the gold as the needle gets there, Type It types the word, the space-bar games
+  press SPACE on cue. Stroop's demo plays level 2 (`DemoLevel`): level 1 never prints a word in
+  the other colour, so it can't show the trap. Play that would give an answer away is behind
+  `Demo`, so a knocked-out player watching the real level never sees it solved; motion games
+  (catching, steering) also play for those watchers, as before.
+- The cursor is a new art piece, `cursor`. `RuleCardShots` (an explicit PlayMode test) renders
+  each game's card at 1.5, 3.5 and 5.5 s for checking by eye; `$SMARTEST_CARD_ONLY` picks games.
+- Fixed on the way, in real play too: `KitWatch` lost a result's words when a game set the same
+  colour twice in a row (Penalty's second "GOAL" was green on a green chip), and Dodge's blocks
+  crossed the WASD hint on their way out of the arena (now clipped to it).
+
+## Minigame art and HUD — 1 Oct 2026
+
+The 49 minigames added since the first 20 got a HUD and, where they show real things, pictures.
+
+**Scoreline tabs.** Two tabs on the game panel's top edge, drawn by the stage: what you've done
+(`Progress("CAUGHT", 3, 7)`: pips up to 10, "n / m" above that, or a bar for "stay in"
+games) and what you have left (`Tries("SHOTS", 2, 5)`). Hidden until GO and for spectators.
+`Scoreline.cs`; games report through `MinigameView.Progress` / `Tries`.
+
+**Illustrated pieces** (`InkArt.cs` draws them, `InkArt.Pieces.cs` lists them): 33 pieces in
+the kit's flat ink-and-paper style, baked to `Resources/Ink/art_*.png` by Build Scenes like
+every other shape. A *tinted* piece is white where its colour goes, so games still colour it
+with Palette roles (a gold fish turns green when caught). `UiKit.Art` places one, `Dress`
+turns a cell into one (Shell Game's cups stay clickable cells), `PivotOn` puts the pivot on a
+point of the drawing, `Marker` adds the kit's star / diamond / dot / square / ✕ / ✓, and
+`FinishLine` the chequered strip.
+
+Where they went: Shell Game (cups on a table), Catch (a basket; Good Catch's red balls carry a
+white diamond), Goalie (glove, net, footballs that spin), Flap (a bird that noses up and
+dives), Keepy Uppy and Penalty (a football; the keeper has a face), Juggle (balls), Slice
+(oranges that fall apart in two halves along your slash, red bombs, and a blade trail),
+Whack (moles and bombs rising out of holes), Pour (a tap and a running stream), Ruler Drop
+(finger and thumb that pinch shut), Statues (a runner with two strides, stock still when
+frozen, and a chequered finish), Toss (flipping coins), Quick Draw (targets; a red one is
+crossed out), Fireflies (glowing flies in the dark), Fishing (fish that face their way and
+are hauled up by the mouth, pufferfish, a hook), Hoops (a basketball, a meshed net), Darts
+(crosshair, darts), Herd (sheep and a sheepdog), Tag (red faces whose eyes follow you),
+Runaway (a worried dot whose eyes look where it runs), Traffic (cars that face their way),
+Putt (a pennant), Echo (each pad has its own mark), Pairs (card backs), Road (centre-line
+dashes that run past). Red things the rules call red stay red (Slice's and Whack's bombs);
+games whose rule says "the dot" (Road, Runaway, Hover) still show a dot.
+
+Checked 1 Oct on the real project: Build Scenes (the 33 pieces baked), EditMode 161/161 (two
+new art tests), PlayMode MatchFlowTests and MinigameSmokeTests; and the full ScreenshotTour (82
+screens) on a copy. To photograph only some games, set `SMARTEST_TOUR_ONLY=traffic,herd` before
+running the tour: it shoots just those and stops.
 
 ## Fifteen more minigames — 29 Sep 2026
 

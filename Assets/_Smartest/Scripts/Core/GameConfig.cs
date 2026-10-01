@@ -54,8 +54,9 @@ namespace Smartest.Core
         [Range(1, 4)] public int minigamesPerQuestion = 2;
 
         [Header("Minigames")]
-        [Tooltip("Rule card before the first level.")]
-        public float minigameIntroSeconds = 2.5f;
+        [Tooltip("Rule card before the first level. It plays a demo of the game (level 1, played by " +
+                 "itself, a hand showing the moves); long enough to see one run of it and read the rule.")]
+        public float minigameIntroSeconds = 8f;
         [Tooltip("The 3-2-1 before each level. Everyone starts on the same instant.")]
         public float minigameLeadInSeconds = 2.0f;
         [Tooltip("How long 'OUT: Ayse, Mert' stays up between levels.")]

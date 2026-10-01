@@ -104,6 +104,77 @@ namespace Smartest.Minigames
         }
 
         /// <summary>
+        /// One of the illustrated pieces (a cup, a fish, a mole: InkSprites.Art). A tinted piece
+        /// takes its colour from <paramref name="tint"/> the way a box does; the others carry
+        /// their own colours and are left white.
+        /// </summary>
+        public static Image Art(Transform parent, string name, string piece, Vector2 size, Vector2 pos, Color? tint = null)
+        {
+            var rt = Node(parent, name, size, pos);
+            var img = rt.gameObject.AddComponent<Image>();
+            img.raycastTarget = false;
+            Dress(img, piece);
+            img.color = tint ?? Color.white;
+            return img;
+        }
+
+        /// <summary>Draws an existing box or cell as an illustrated piece; its clicks and colour stay as they were.</summary>
+        public static void Dress(Image img, string piece)
+        {
+            if (img == null) return;
+            img.sprite = InkSprites.Art(piece);
+            img.type = img.sprite.border != Vector4.zero ? Image.Type.Sliced : Image.Type.Simple;
+        }
+
+        /// <summary>A chequered finish line: the flag repeated down its height (40 px a flag).</summary>
+        public static Image FinishLine(Transform parent, string name, float height, Vector2 pos)
+        {
+            var rt = Node(parent, name, new Vector2(22f, height), pos);
+            var img = rt.gameObject.AddComponent<Image>();
+            img.sprite = InkSprites.Checker;
+            img.type = Image.Type.Tiled;
+            img.raycastTarget = false;
+            return img;
+        }
+
+        /// <summary>The kit's small marks, for telling things apart by shape as well as colour.</summary>
+        public enum Mark { Star, Diamond, Dot, Square, Cross, Check }
+
+        /// <summary>A mark, coloured like a box: ink for a solid one, a light colour for one with an ink edge.</summary>
+        public static Image Marker(Transform parent, string name, Mark mark, float size, Vector2 pos, Color color)
+        {
+            var rt = Node(parent, name, new Vector2(size, size), pos);
+            var img = rt.gameObject.AddComponent<Image>();
+            img.raycastTarget = false;
+            switch (mark)
+            {
+                case Mark.Star: img.sprite = InkSprites.Star; break;
+                case Mark.Diamond: img.sprite = InkSprites.Diamond; break;
+                case Mark.Dot: img.sprite = InkSprites.Dot; break;
+                case Mark.Cross: img.sprite = InkSprites.Cross; break;
+                case Mark.Check: img.sprite = InkSprites.Check; break;
+                default:
+                    img.sprite = InkSprites.Box(3f);
+                    img.type = Image.Type.Sliced;
+                    rt.sizeDelta *= 0.8f; // a square looks bigger than a star of the same size
+                    break;
+            }
+            img.color = color;
+            return img;
+        }
+
+        /// <summary>
+        /// Puts the pivot on a point of the piece (in its own pixels, y down from the top left), so
+        /// that point is what anchoredPosition places and what it turns about.
+        /// </summary>
+        public static void PivotOn(Image img, string piece, Vector2 point)
+        {
+            var size = InkSprites.ArtSize(piece);
+            if (img == null || size.x <= 0f) return;
+            img.rectTransform.pivot = new Vector2(point.x / size.x, 1f - point.y / size.y);
+        }
+
+        /// <summary>
         /// Text. Words the game shouts ("MEMORISE", "HIT") are its "Hint" label and come out in
         /// the display face, on a chip when they're gold, red or green. Big numbers use the
         /// display face too; small instructions become tracked caps.

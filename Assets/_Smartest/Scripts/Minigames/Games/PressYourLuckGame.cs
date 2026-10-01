@@ -61,7 +61,11 @@ namespace Smartest.Minigames
                 return;
             }
 
-            if (!CanAct || !KeyInput.SpacePressed()) return;
+            // The rule card's demo holds its nerve a few seconds, then banks well short of the bust.
+            bool press = CanAct ? KeyInput.SpacePressed()
+                : Demo && Elapsed >= Mathf.Min(3.5f, _bustAt * 0.5f);
+            if (!press) return;
+            if (Demo) PressKey("SPACE");
 
             if (_label != null) { _label.text = "Banked " + _bank; _label.color = Palette.Green; }
             if (_bankText != null) _bankText.color = Palette.Green;

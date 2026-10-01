@@ -87,6 +87,13 @@ namespace Smartest.Minigames
 
             // Someone already out watches a tidy tower build itself.
             bool drop = CanAct ? KeyInput.MousePressed() : !Interactive && Mathf.Abs(x - _topX) <= _speed * dt;
+            // The rule card's demo shows the click: the hand waits over where the block should land.
+            if (Demo)
+            {
+                var over = new Vector2(_topX, _moving.anchoredPosition.y + 110f);
+                if (drop) TapAt(over);
+                else PointAt(over);
+            }
             if (!drop)
             {
                 if (CanAct && Elapsed - _blockStart > PerBlock) Fail("TOO SLOW");

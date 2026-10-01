@@ -47,11 +47,22 @@ namespace Smartest.Minigames
         protected override void OnTick(float dt)
         {
             if (Elapsed > 8f) Fail("TOO SLOW");
+
+            // The rule card's demo looks the grid over, then clicks the odd colour out.
+            if (Demo && !IsDone && Elapsed >= 0.8f)
+            {
+                PointAt(Where(_cells[_answer]));
+                if (Elapsed >= 1.15f)
+                {
+                    TapAt(Where(_cells[_answer]));
+                    OnCell(_answer);
+                }
+            }
         }
 
         private void OnCell(int index)
         {
-            if (!CanAct) return;
+            if (!CanMove) return;
             if (index != _answer)
             {
                 _cells[index].color = Palette.Red;

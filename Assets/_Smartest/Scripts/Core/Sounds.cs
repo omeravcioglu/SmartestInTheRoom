@@ -25,8 +25,17 @@ namespace Smartest.Core
         private const int SampleRate = 44100;
         private static readonly Dictionary<Kind, AudioClip> s_cache = new Dictionary<Kind, AudioClip>();
 
+        private static int s_hushed;
+
+        /// <summary>
+        /// While hushed, Play does nothing: the rule card's demo plays a whole level in the corner
+        /// and mustn't sound like the real thing. Calls nest; every Hush(true) wants a Hush(false).
+        /// </summary>
+        public static void Hush(bool on) => s_hushed = Mathf.Max(0, s_hushed + (on ? 1 : -1));
+
         public static void Play(Kind kind, float volume = 1f)
         {
+            if (s_hushed > 0) return;
             var director = AudioDirector.Instance;
             if (director == null) return;
             director.PlaySfx(Get(kind), volume);

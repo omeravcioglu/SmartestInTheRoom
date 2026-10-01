@@ -6,6 +6,7 @@
         "UnityEditor.TestRunner",
         "Smartest",
         "Unity.Netcode.Runtime",
+        "Unity.Collections",
         "UnityEngine.UI",
         "Unity.TextMeshPro"
     ],

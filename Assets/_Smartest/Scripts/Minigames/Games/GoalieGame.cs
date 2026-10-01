@@ -64,6 +64,10 @@ namespace Smartest.Minigames
             _centreY = (top + bottom) * 0.5f;
             UiKit.Box(Area, "Pitch", new Vector2(halfW * 2f, top - bottom), new Vector2(0f, _centreY), Palette.PanelRaised);
             float goalX = -halfW + 40f;
+            // The net fills the strip behind the line.
+            var net = UiKit.Art(Area, "Net", "net", new Vector2(goalX - 4f - (-halfW + 4f), top - bottom - 8f),
+                new Vector2((goalX - 4f + (-halfW + 4f)) * 0.5f, _centreY));
+            net.type = Image.Type.Tiled;
             UiKit.Fill(Area, "GoalLine", new Vector2(8f, top - bottom - 8f), new Vector2(goalX, _centreY), Palette.Ink);
             _gloveX = goalX + 34f;
             _x0 = halfW - 30f;
@@ -78,13 +82,13 @@ namespace Smartest.Minigames
                 float y1 = RandomRange(Mathf.Max(-_yLimit, lastY - reach), Mathf.Min(_yLimit, lastY + reach));
                 lastY = y1;
                 float y0 = RandomRange(-_yLimit, _yLimit);
-                var img = UiKit.Dot(Area, "Shot" + i, ShotR * 2f, new Vector2(_x0, _centreY + y0), Palette.Accent);
+                var img = UiKit.Art(Area, "Shot" + i, "ball", new Vector2(ShotR * 2f, ShotR * 2f), new Vector2(_x0, _centreY + y0), Palette.Accent);
                 img.gameObject.SetActive(false);
                 _shots[i] = new Shot { Y0 = y0, Y1 = y1, Start = 0.6f + i * interval, View = (RectTransform)img.transform, Image = img };
             }
 
             _gloveY = 0f;
-            _glove = (RectTransform)UiKit.Box(Area, "Glove", new Vector2(GloveW, _gloveH), new Vector2(_gloveX, _centreY), Palette.Ink).transform;
+            _glove = (RectTransform)UiKit.Art(Area, "Glove", "glove", new Vector2(GloveW + 4f, _gloveH), new Vector2(_gloveX, _centreY)).transform;
             _label = UiKit.Label(Area, "Hint", "STOP EVERY SHOT", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
             Progress("SAVED", 0, n);
@@ -113,6 +117,7 @@ namespace Smartest.Minigames
                 if (!s.View.gameObject.activeSelf) s.View.gameObject.SetActive(true);
                 var p = ShotAt(s, age);
                 s.View.anchoredPosition = p;
+                s.View.localRotation = Quaternion.Euler(0f, 0f, age * 400f); // struck with spin
 
                 if (!s.Judged && p.x - ShotR <= _gloveX + GloveW * 0.5f)
                 {
@@ -137,7 +142,7 @@ namespace Smartest.Minigames
                 if (p.x < _gloveX - 60f) { s.Gone = true; s.View.gameObject.SetActive(false); }
             }
 
-            if (allDone && CanAct)
+            if (allDone && CanMove)
             {
                 _label.text = "CLEAN SHEET";
                 _label.color = Palette.Green;
@@ -164,6 +169,7 @@ namespace Smartest.Minigames
                 }
             }
             _glove.anchoredPosition = new Vector2(_gloveX, _centreY + _gloveY);
+            if (Demo) PointAt(_glove.anchoredPosition); // the glove goes where the mouse is: the demo's hand is on it
         }
 
         private void Fail(string why)

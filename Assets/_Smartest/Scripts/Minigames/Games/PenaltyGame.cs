@@ -74,13 +74,13 @@ namespace Smartest.Minigames
             UiKit.Dot(_keeper, "GloveL", 30f, new Vector2(-_reach + 20f, 118f), Palette.Accent);
             UiKit.Dot(_keeper, "GloveR", 30f, new Vector2(_reach - 20f, 118f), Palette.Accent);
             UiKit.Dot(_keeper, "Head", 36f, new Vector2(0f, 128f), Palette.PaperHi);
+            UiKit.Dot(_keeper, "EyeL", 6f, new Vector2(-7f, 131f), Palette.Ink);
+            UiKit.Dot(_keeper, "EyeR", 6f, new Vector2(7f, 131f), Palette.Ink);
 
             _spot = new Vector2(0f, -size.y * 0.5f + 90f);
             UiKit.Dot(Area, "Spot", 14f, _spot, Palette.PaperHi);
-            _ball = (RectTransform)UiKit.Dot(Area, "Ball", BallR * 2f, _spot, Palette.PaperHi).transform;
-            UiKit.Dot(_ball, "Patch", 14f, Vector2.zero, Palette.Ink);
-            _cross = (RectTransform)UiKit.Dot(Area, "Aim", 30f, new Vector2(0f, 30f), Palette.Accent).transform;
-            UiKit.Dot(_cross, "Pip", 8f, Vector2.zero, Palette.Ink);
+            _ball = (RectTransform)UiKit.Art(Area, "Ball", "ball", new Vector2(BallR * 2f, BallR * 2f), _spot, Palette.PaperHi).transform;
+            _cross = (RectTransform)UiKit.Art(Area, "Aim", "crosshair", new Vector2(40f, 40f), new Vector2(0f, 30f), Palette.Accent).transform;
             _aim = new Vector2(0f, 30f);
 
             Tell();
@@ -112,8 +112,19 @@ namespace Smartest.Minigames
                 _aim = new Vector2(Mathf.Clamp(m.x, -GoalHalf - 120f, GoalHalf + 120f), Mathf.Clamp(m.y, GroundY + 10f, BarY + 90f));
                 shoot = KeyInput.MousePressed();
             }
-            else if (!Interactive && !_flying && _taken < Shots) _aim = AutoAim(out shoot);
+            else if (!Interactive && !_flying && _taken < Shots)
+            {
+                var want = AutoAim(out shoot);
+                // The rule card's demo moves its mouse over rather than jumping, and shoots once it's there.
+                if (Demo)
+                {
+                    _aim = Vector2.MoveTowards(_aim, want, 2400f * dt);
+                    shoot &= _aim == want;
+                }
+                else _aim = want;
+            }
             _cross.anchoredPosition = _aim;
+            if (Demo) PointAt(_aim); // the crosshair is where the mouse is: the demo's hand is on it
 
             // The keeper reads where you were aiming a moment ago.
             _trail.Enqueue((Elapsed, _aim.x));
@@ -131,6 +142,7 @@ namespace Smartest.Minigames
             }
             else if (shoot && Elapsed >= _nextShotAt && _taken < Shots)
             {
+                if (Demo) TapAt(_aim);
                 _flying = true;
                 _shotAt = Elapsed;
                 _target = _aim;
@@ -154,6 +166,7 @@ namespace Smartest.Minigames
             var at = Vector2.Lerp(_spot, _target, t) + new Vector2(0f, Mathf.Sin(t * Mathf.PI) * 40f);
             _ball.anchoredPosition = at;
             _ball.localScale = Vector3.one * Mathf.Lerp(1f, 0.7f, t);
+            _ball.localRotation = Quaternion.Euler(0f, 0f, -Mathf.Sign(_target.x - _spot.x) * t * 540f);
 
             // The dive: straight for the ball, as fast as he can go, leaning into it.
             float dir = Mathf.Sign(_target.x - _keeperX);
@@ -173,7 +186,7 @@ namespace Smartest.Minigames
             else { result = "GOAL"; _scored++; }
             Tell();
             _nextShotAt = Elapsed + 0.7f;
-            if (!CanAct)
+            if (!CanMove)
             {
                 ResetBall();
                 return;
@@ -197,6 +210,7 @@ namespace Smartest.Minigames
         {
             _ball.anchoredPosition = _spot;
             _ball.localScale = Vector3.one;
+            _ball.localRotation = Quaternion.identity;
         }
     }
 }

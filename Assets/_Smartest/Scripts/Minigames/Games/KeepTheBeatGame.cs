@@ -22,6 +22,7 @@ namespace Smartest.Minigames
         private float _error;
         private float _flashUntil;
         private int _pulsesPlayed;
+        private int _demoTaps;
 
         protected override void Build()
         {
@@ -66,7 +67,11 @@ namespace Smartest.Minigames
             float lastExpected = ExpectedAt(_silentBeats - 1);
             if (_pressed < _silentBeats && Elapsed > lastExpected + _tolerance + 0.3f) { Fail("MISSED A BEAT"); return; }
 
-            if (!CanAct || !KeyInput.SpacePressed()) return;
+            // The rule card's demo taps along from the third lead beat and keeps the time through
+            // the silence.
+            bool press = CanAct ? KeyInput.SpacePressed() : Demo && Elapsed >= (2 + _demoTaps) * _interval;
+            if (!press) return;
+            if (Demo) { _demoTaps++; PressKey("SPACE"); }
 
             // Tapping along with the lead beats is how people find a rhythm, and the rule
             // says "keep pressing" — so those taps are free. Scoring starts at beat five.

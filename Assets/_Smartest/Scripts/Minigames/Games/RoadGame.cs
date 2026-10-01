@@ -14,12 +14,15 @@ namespace Smartest.Minigames
     {
         /// <summary>Thin slices: at 24 px a bend read as a staircase.</summary>
         private const float SliceH = 8f;
+        /// <summary>Each slice overlaps its neighbours by this much, so their soft edges don't show as seams.</summary>
+        private const float Overlap = 3f;
         private const float CarR = 14f;
         private const float GetOnBy = 3f;
         private const float WatchStart = 1f;
 
         private RectTransform[] _edges = new RectTransform[0];
         private RectTransform[] _lanes = new RectTransform[0];
+        private RectTransform[] _dashes = new RectTransform[0];
         private float[] _sliceY = new float[0];
         private RectTransform _car;
         private Image _carImage;
@@ -32,6 +35,7 @@ namespace Smartest.Minigames
         private float _a1, _a2, _w1, _w2, _p1, _p2;
         private float _startAt = -1f;
         private float _distSum, _timeSum;
+        private float _demoX; // the demo's mouse, across
 
         protected override void Build()
         {
@@ -74,16 +78,24 @@ namespace Smartest.Minigames
             _lanes = new RectTransform[n];
             for (int i = 0; i < n; i++) _sliceY[i] = _carY - 40f + SliceH * (i + 0.5f);
             for (int i = 0; i < n; i++)
-                _edges[i] = (RectTransform)UiKit.Fill(Area, "Edge" + i, new Vector2(_width + 10f, SliceH + 1f), new Vector2(0f, _sliceY[i]), Palette.Ink).transform;
+                _edges[i] = (RectTransform)UiKit.Fill(Area, "Edge" + i, new Vector2(_width + 10f, SliceH + Overlap), new Vector2(0f, _sliceY[i]), Palette.Ink).transform;
             for (int i = 0; i < n; i++)
-                _lanes[i] = (RectTransform)UiKit.Fill(Area, "Road" + i, new Vector2(_width, SliceH + 1f), new Vector2(0f, _sliceY[i]), Palette.PanelRaised).transform;
+                _lanes[i] = (RectTransform)UiKit.Fill(Area, "Road" + i, new Vector2(_width, SliceH + Overlap), new Vector2(0f, _sliceY[i]), Palette.PanelRaised).transform;
+            // The centre line, in dashes that run past as you drive.
+            _dashes = new RectTransform[n];
+            for (int i = 0; i < n; i++)
+                _dashes[i] = (RectTransform)UiKit.Fill(Area, "Dash" + i, new Vector2(4f, SliceH + Overlap), new Vector2(0f, _sliceY[i]), Palette.Ink2).transform;
 
             _carImage = UiKit.Dot(Area, "Car", CarR * 2f, new Vector2(0f, _carY), Palette.Accent);
             _car = (RectTransform)_carImage.transform;
-            if (!Interactive) _car.gameObject.SetActive(false);
+            // Someone already out has no car on the road; the demo drives one.
+            if (!Interactive && !Demo) _car.gameObject.SetActive(false);
             _label = UiKit.Label(Area, "Hint", "GET ON THE ROAD", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
             Place(0f);
+            // The demo's car starts off to one side, so it has to steer onto the road.
+            float roadX = RoadX(0f);
+            _demoX = roadX + (roadX > 0f ? -230f : 230f);
         }
 
         private float RoadX(float tau) => _a1 * Mathf.Sin(_w1 * tau + _p1) + _a2 * Mathf.Sin(_w2 * tau + _p2);
@@ -96,17 +108,22 @@ namespace Smartest.Minigames
                 float x = RoadX(t + (_sliceY[i] - _carY) / _scroll);
                 _edges[i].anchoredPosition = new Vector2(x, _sliceY[i]);
                 _lanes[i].anchoredPosition = new Vector2(x, _sliceY[i]);
+                _dashes[i].anchoredPosition = new Vector2(x, _sliceY[i]);
+                bool dash = Mathf.Repeat(_scroll * t + _sliceY[i], 48f) < 26f;
+                if (_dashes[i].gameObject.activeSelf != dash) _dashes[i].gameObject.SetActive(dash);
             }
         }
 
         protected override void OnTick(float dt)
         {
-            if (!Interactive && _startAt < 0f) _startAt = WatchStart;
+            // The demo waits for its own car to get on, like a player.
+            if (!Interactive && !Demo && _startAt < 0f) _startAt = WatchStart;
             float t = _startAt < 0f ? 0f : Mathf.Max(0f, Elapsed - _startAt);
             Place(t);
 
-            if (!CanAct) return;
-            if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var local)) return;
+            Vector2 local;
+            if (Demo) local = DemoSteer(t, dt);
+            else if (!CanAct || !UiKit.LocalPoint(Area, KeyInput.MousePosition(), out local)) return;
             float carX = Mathf.Clamp(local.x, -_halfW + CarR, _halfW - CarR);
             _car.anchoredPosition = new Vector2(carX, _carY);
             float off = Mathf.Abs(carX - RoadX(t));
@@ -133,6 +150,15 @@ namespace Smartest.Minigames
                 // Tenths of a pixel: whole pixels would tie, and a tie means a play-off.
                 Finish(false, Mathf.RoundToInt(_distSum / Mathf.Max(0.001f, _timeSum) * 10f));
             }
+        }
+
+        /// <summary>The rule card's demo: a beat, onto the road, then steering round its bends, the hand on the car.</summary>
+        private Vector2 DemoSteer(float t, float dt)
+        {
+            if (Elapsed >= 0.3f) _demoX = Mathf.MoveTowards(_demoX, RoadX(t) + 6f * Mathf.Sin(Elapsed * 1.4f), 500f * dt);
+            var at = new Vector2(_demoX, _carY);
+            PointAt(at);
+            return at;
         }
 
         private void Fail(string why)

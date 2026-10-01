@@ -26,7 +26,7 @@ namespace Smartest.Minigames
 
         private RectTransform _ball;
         private Image _ballImage;
-        private RectTransform _rim, _board, _netL, _netR, _rimL, _rimR;
+        private RectTransform _rim, _board, _netL, _netR, _netX, _netY, _netMid, _rimL, _rimR;
         private readonly List<RectTransform> _guide = new List<RectTransform>();
         private TMP_Text _label;
         private Vector2 _rest;
@@ -34,12 +34,14 @@ namespace Smartest.Minigames
         private bool _aiming, _flying;
         private float _resetAt = -1f;
         private float _nextAuto = 0.8f;
+        private float _demoFrom = -1f; // the demo: when it went for the ball
         private float _floorY, _halfW;
         private Vector2 _hoopBase;
         private float _hoopSwing, _hoopFreq;
         private float _guideTime;
         private int _need, _shots, _shotsLeft, _made;
         private float _acc;
+        private float _spin;
 
         protected override void Build()
         {
@@ -67,6 +69,9 @@ namespace Smartest.Minigames
             _board = UiKit.Line(Area, "Board", Vector2.zero, Vector2.up, 10f, Palette.Ink);
             _netL = UiKit.Line(Area, "NetL", Vector2.zero, Vector2.up, 3f, Palette.Ink2);
             _netR = UiKit.Line(Area, "NetR", Vector2.zero, Vector2.up, 3f, Palette.Ink2);
+            _netX = UiKit.Line(Area, "NetX", Vector2.zero, Vector2.up, 2f, Palette.Ink2);
+            _netY = UiKit.Line(Area, "NetY", Vector2.zero, Vector2.up, 2f, Palette.Ink2);
+            _netMid = UiKit.Line(Area, "NetMid", Vector2.zero, Vector2.right, 2f, Palette.Ink2);
             _rim = UiKit.Line(Area, "Rim", Vector2.zero, Vector2.right, 6f, Palette.Red);
             _rimL = (RectTransform)UiKit.Dot(Area, "RimL", RimEndR * 2f, Vector2.zero, Palette.Red).transform;
             _rimR = (RectTransform)UiKit.Dot(Area, "RimR", RimEndR * 2f, Vector2.zero, Palette.Red).transform;
@@ -80,7 +85,7 @@ namespace Smartest.Minigames
             }
             _rest = new Vector2(-_halfW + 130f, _floorY + BallR + 4f);
             _p = _rest;
-            _ballImage = UiKit.Dot(Area, "Ball", BallR * 2f, _rest, Palette.Accent);
+            _ballImage = UiKit.Art(Area, "Ball", "hoop_ball", new Vector2(BallR * 2f, BallR * 2f), _rest, Palette.Accent);
             _ball = (RectTransform)_ballImage.transform;
 
             _shots = _shotsLeft;
@@ -107,6 +112,10 @@ namespace Smartest.Minigames
             UiKit.SetLine(_board, h + new Vector2(RimHalf + 14f, -20f), h + new Vector2(RimHalf + 14f, 120f));
             UiKit.SetLine(_netL, h + new Vector2(-RimHalf, 0f), h + new Vector2(-RimHalf * 0.55f, -60f));
             UiKit.SetLine(_netR, h + new Vector2(RimHalf, 0f), h + new Vector2(RimHalf * 0.55f, -60f));
+            // The mesh between them.
+            UiKit.SetLine(_netX, h + new Vector2(-RimHalf, 0f), h + new Vector2(RimHalf * 0.55f, -60f));
+            UiKit.SetLine(_netY, h + new Vector2(RimHalf, 0f), h + new Vector2(-RimHalf * 0.55f, -60f));
+            UiKit.SetLine(_netMid, h + new Vector2(-RimHalf * 0.78f, -30f), h + new Vector2(RimHalf * 0.78f, -30f));
         }
 
         protected override void OnTick(float dt)
@@ -129,6 +138,7 @@ namespace Smartest.Minigames
             if (!_flying)
             {
                 if (Interactive) Aim();
+                else if (Demo) DemoShot();
                 else AutoShot();
                 return;
             }
@@ -149,6 +159,52 @@ namespace Smartest.Minigames
             _shotsLeft--;
             Tell();
             _nextAuto = Elapsed + 1.6f;
+        }
+
+        /// <summary>
+        /// The rule card's demo takes that shot the way a player does: on to the ball, press, pull
+        /// back along the shot for half a second while the ball and the guide show it, let go.
+        /// Dead on the middle of the hoop, so level 1 goes in.
+        /// </summary>
+        private void DemoShot()
+        {
+            if (_shotsLeft <= 0) return;
+            const float flight = 0.95f, press = 0.3f, pulled = 0.6f, letGo = 0.85f;
+            if (_demoFrom < 0f) _demoFrom = Elapsed + (_shotsLeft == _shots ? 0.4f : 0f);
+            float t = Elapsed - _demoFrom;
+            if (t < press)
+            {
+                // A look at the court first, then on to the ball.
+                PointAt(t < 0f ? _rest + new Vector2(160f, 120f) : _rest);
+                return;
+            }
+            var target = HoopAt(Elapsed + Mathf.Max(0f, letGo - t) + flight) + new Vector2(0f, 10f);
+            var v = new Vector2((target.x - _rest.x) / flight, (target.y - _rest.y) / flight + 0.5f * Gravity * flight);
+            var pull = Vector2.ClampMagnitude(v / Power, MaxPull) * Mathf.SmoothStep(0f, 1f, (t - press) / (pulled - press));
+            _ball.anchoredPosition = _rest - pull * 0.15f;
+            for (int i = 0; i < _guide.Count; i++)
+            {
+                float u = _guideTime * (i + 1) / _guide.Count;
+                _guide[i].anchoredPosition = _rest + pull * Power * u + 0.5f * Gravity * u * u * Vector2.down;
+                _guide[i].gameObject.SetActive(pull.magnitude > 12f);
+            }
+            // The ball sits on the floor, so a full pull ends below the picture, where the hand
+            // would be cut off: it goes all the way back sideways and only a little lower than
+            // the ball. The guide shows where the shot really goes.
+            var back = _rest - pull;
+            back.y = Mathf.Max(back.y, _rest.y - 30f);
+            HoldAt(back, t < letGo);
+            if (t < letGo) return;
+
+            // Let go.
+            foreach (var g in _guide) g.gameObject.SetActive(false);
+            _ball.anchoredPosition = _rest;
+            _v = pull * Power;
+            _p = _rest;
+            _flying = true;
+            _shotsLeft--;
+            Tell();
+            _demoFrom = -1f;
         }
 
         private void Aim()
@@ -213,6 +269,8 @@ namespace Smartest.Minigames
                 if (_p.y - BallR <= _floorY || _p.x > _halfW + BallR || _p.x < -_halfW - BallR) over = true;
             }
             _ball.anchoredPosition = _p;
+            _spin -= _v.x * dt / BallR * Mathf.Rad2Deg; // it rolls through the air the way it's going
+            _ball.localRotation = Quaternion.Euler(0f, 0f, _spin);
 
             if (scored)
             {

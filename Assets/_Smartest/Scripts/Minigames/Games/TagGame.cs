@@ -19,6 +19,7 @@ namespace Smartest.Minigames
 
         private RectTransform[] _views = new RectTransform[0];
         private Image[] _images = new Image[0];
+        private RectTransform[] _eyes = new RectTransform[0];
         private Vector2[] _p = new Vector2[0];
         private Vector2[] _v = new Vector2[0];
         private Rect _box;
@@ -30,6 +31,8 @@ namespace Smartest.Minigames
         private float _acc;
         private float _closest = float.MaxValue;
         private Vector2 _phantomFreq;
+        private Vector2 _demoAt;     // the demo's mouse
+        private float _demoAngle;    // how far round its loop the demo is
 
         /// <summary>Bigger clearance is better, so the worst result is none at all.</summary>
         public override int WorstMetric => 0;
@@ -59,17 +62,24 @@ namespace Smartest.Minigames
 
             _views = new RectTransform[chasers];
             _images = new Image[chasers];
+            _eyes = new RectTransform[chasers * 2];
             _p = new Vector2[chasers];
             _v = new Vector2[chasers];
             for (int i = 0; i < chasers; i++)
             {
                 _p[i] = Corner(i == 0 ? new Vector2(-1f, 1f) : new Vector2(1f, -1f));
-                _images[i] = UiKit.Dot(Area, "Chaser" + i, ChaserR * 2f, _p[i], Palette.Red);
+                _images[i] = UiKit.Art(Area, "Chaser" + i, "chaser", new Vector2(ChaserR, ChaserR) * (100f / 44f), _p[i], Palette.Red);
                 _views[i] = (RectTransform)_images[i].transform;
+                // Eyes that keep on you.
+                for (int e = 0; e < 2; e++)
+                    _eyes[i * 2 + e] = (RectTransform)UiKit.Dot(_views[i], "Eye" + e, ChaserR * 0.3f, Vector2.zero, Palette.Ink).transform;
             }
             _phantomFreq = new Vector2(RandomRange(0.5f, 0.8f), RandomRange(0.7f, 1.1f));
             _label = UiKit.Label(Area, "Hint", "GET IN THE BOX", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+            // The demo's hand starts outside the box on the left, low, and joins its loop at the bottom.
+            _demoAt = new Vector2(_box.xMin - 56f, _box.center.y - 120f);
+            _demoAngle = -Mathf.PI * 0.5f;
         }
 
         private Vector2 Corner(Vector2 side) =>
@@ -78,7 +88,8 @@ namespace Smartest.Minigames
         protected override void OnTick(float dt)
         {
             Vector2 target;
-            if (!Interactive)
+            if (Demo) target = DemoRun(dt); // the demo plays it for real, with its own cursor
+            else if (!Interactive)
             {
                 if (_startAt < 0f) _startAt = WatchStart;
                 // Someone watching sees them chase a player who isn't there.
@@ -86,6 +97,7 @@ namespace Smartest.Minigames
             }
             else if (!CanAct || !UiKit.LocalPoint(Area, KeyInput.MousePosition(), out target)) return;
 
+            Watch(target);
             if (_startAt < 0f)
             {
                 if (!_box.Contains(target)) { if (Elapsed > GetInBy) Fail("NEVER GOT IN"); return; }
@@ -126,7 +138,7 @@ namespace Smartest.Minigames
                 }
             }
             for (int i = 0; i < _p.Length; i++) _views[i].anchoredPosition = _p[i];
-            if (!CanAct) return;
+            if (!CanMove) return;
 
             if (!_box.Contains(target)) { Fail("LEFT THE BOX"); return; }
             Progress("STAY FREE", t / _hold);
@@ -147,6 +159,36 @@ namespace Smartest.Minigames
                 _label.color = Palette.Green;
                 // Tenths of a pixel: whole pixels would tie, and a tie means a play-off.
                 Finish(false, Mathf.RoundToInt(Mathf.Max(0f, _closest) * 10f));
+            }
+        }
+
+        /// <summary>
+        /// The rule card's demo: a beat, in from the side, then round and round a loop about the
+        /// middle of the box, quicker than the chaser, which cuts inside and never gets there.
+        /// </summary>
+        private Vector2 DemoRun(float dt)
+        {
+            const float wide = 190f, high = 170f;
+            if (_startAt >= 0f)
+            {
+                // A steady pace round the loop: the angle moves by the distance over the loop's local stretch.
+                float sin = Mathf.Sin(_demoAngle), cos = Mathf.Cos(_demoAngle);
+                _demoAngle += 340f * dt / Mathf.Max(1f, Mathf.Sqrt(wide * wide * sin * sin + high * high * cos * cos));
+            }
+            var aim = _box.center + new Vector2(wide * Mathf.Cos(_demoAngle), high * Mathf.Sin(_demoAngle));
+            if (Elapsed >= 0.3f) _demoAt = Vector2.MoveTowards(_demoAt, aim, 600f * dt);
+            PointAt(_demoAt);
+            return _demoAt;
+        }
+
+        private void Watch(Vector2 target)
+        {
+            for (int i = 0; i < _views.Length; i++)
+            {
+                var to = target - _p[i];
+                var look = to.sqrMagnitude > 1f ? to.normalized * (ChaserR * 0.12f) : Vector2.zero;
+                _eyes[i * 2].anchoredPosition = new Vector2(-ChaserR * 0.32f, ChaserR * 0.09f) + look;
+                _eyes[i * 2 + 1].anchoredPosition = new Vector2(ChaserR * 0.32f, ChaserR * 0.09f) + look;
             }
         }
 

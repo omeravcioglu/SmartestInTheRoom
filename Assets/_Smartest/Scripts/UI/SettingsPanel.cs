@@ -23,7 +23,6 @@ namespace Smartest.UI
         [SerializeField] private TMP_Text sfxValue;
         [SerializeField] private Button closeButton;
         [SerializeField] private Button openButton;
-        [SerializeField] private TMP_Text musicHint;
         [SerializeField] private Button captionsToggle;
         [SerializeField] private Image captionsTrack;
         [SerializeField] private RectTransform captionsKnob;
@@ -84,8 +83,6 @@ namespace Smartest.UI
             if (sfxSlider != null) sfxSlider.value = d.Sfx;
             _syncing = false;
             Relabel();
-
-            if (musicHint != null) musicHint.gameObject.SetActive(!d.HasMusic);
         }
 
         private void Relabel()
@@ -166,7 +163,8 @@ namespace Smartest.UI
             var frameSpace = Ink.Node(root, "Frame");
             frameSpace.Fill(2000f, 2000f, 2000f, 2000f);
             var card = Ink.Box(frameSpace, "Card", Palette.PaperHi, 4f, 0f, raycast: true);
-            card.rectTransform.At(580f, 118f, 760f, 844f);
+            const float cardH = 826f;
+            card.rectTransform.At(580f, (1080f - cardH) * 0.5f, 760f, cardH);
             Ink.Shadow(card, 14f, Palette.Gold);
             var c = card.transform;
 
@@ -192,15 +190,6 @@ namespace Smartest.UI
                 values[i].rectTransform.At(760f - 48f - 200f, y - 8f, 200f, 50f);
                 sliders[i] = CreateSlider(c, "Slider" + i, 48f, y + 48f, 664f);
                 y += 112f;
-                if (i == 2)
-                {
-                    var hint = Ink.Text(c, "MusicHint", "No music yet — drop a loop into Audio/Music and rebuild.",
-                        TypeRole.Body, 18f, Palette.Ink2, TextAlignmentOptions.TopLeft).OneLine();
-                    hint.fontStyle |= FontStyles.Italic;
-                    hint.rectTransform.At(48f, y - 16f, 664f, 26f);
-                    panel.musicHint = hint;
-                    y += 18f;
-                }
             }
             panel.masterSlider = sliders[0]; panel.narratorSlider = sliders[1];
             panel.musicSlider = sliders[2]; panel.sfxSlider = sliders[3];
@@ -227,7 +216,7 @@ namespace Smartest.UI
             panel.RefreshCaptions();
 
             var done = Ink.Slab(c, "Done", "Done", Palette.Gold, Palette.Ink, 80f, 4f, 8f);
-            done.GetComponent<RectTransform>().At((760f - 320f) * 0.5f, 844f - 38f - 104f, 320f, 104f);
+            done.GetComponent<RectTransform>().At((760f - 320f) * 0.5f, cardH - 38f - 104f, 320f, 104f);
             panel.closeButton = done;
             return panel;
         }

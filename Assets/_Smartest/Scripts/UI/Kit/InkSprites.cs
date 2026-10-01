@@ -8,7 +8,7 @@ namespace Smartest.UI
     /// <summary>
     /// Every shape in the Tabloid skin, drawn in code from a handful of numbers at twice canvas
     /// resolution: bordered boxes (9-sliced), dashed boxes (tiled), halftone tokens, the timer
-    /// burst, and a few icons.
+    /// burst, a few icons, and the minigames' illustrated pieces (InkArt.cs).
     ///
     /// Shapes are white with the ink border baked in. An Image's colour multiplies the texture,
     /// so tinting a box gold turns the inside gold while the near-black border stays ink —
@@ -18,7 +18,7 @@ namespace Smartest.UI
     /// At runtime they load from there; anything not baked (a dot of an unusual size) is drawn
     /// on the spot and cached.
     /// </summary>
-    public static class InkSprites
+    public static partial class InkSprites
     {
         /// <summary>Texels per canvas pixel. Sprites carry a matching pixelsPerUnit.</summary>
         public const float Scale = 2f;
@@ -119,6 +119,7 @@ namespace Smartest.UI
             yield return RenderHatch("hatch");
             yield return RenderDots("dots");
             yield return RenderPolygon("tail", 64, 26f, new[] { new Vector2(1f, 0f), new Vector2(25f, 0f), new Vector2(4f, 19f) }, 3f);
+            foreach (var art in RenderArtCatalogue()) yield return art;
         }
 
         private static readonly (float border, float radius)[] StandardBoxes =

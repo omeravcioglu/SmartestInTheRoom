@@ -32,6 +32,8 @@ namespace Smartest.Minigames
         private int _brush = 1;
         private bool _wiped;
         private TMP_Text _label;
+        private int _demoBrush; // the colour the rule card's demo last took from the palette
+        private int _demoMoves; // and how many clicks it has made
 
         protected override void Build()
         {
@@ -103,6 +105,27 @@ namespace Smartest.Minigames
                 MarkBrush();
             }
 
+            if (Demo)
+            {
+                // The rule card's demo paints it back a colour at a time: that colour's swatch
+                // first, then its cells, a move a beat.
+                int cell = -1;
+                for (int c = 1; c <= _colours && cell < 0; c++)
+                    for (int i = 0; i < _target.Length && cell < 0; i++)
+                        if (_target[i] == c && _painted[i] != c) cell = i;
+                if (cell < 0) return;
+                int colour = _target[cell];
+                bool swatch = _demoBrush != colour;
+                var at = swatch ? Where(_swatches[colour - 1]) : Where(_cells[cell]);
+                float t = Elapsed - _showFor - _demoMoves * 0.5f;
+                if (t >= 0.3f) PointAt(at);
+                if (t < 0.6f) return;
+                TapAt(at);
+                _demoMoves++;
+                if (swatch) { PickBrush(colour - 1); _demoBrush = colour; }
+                else Paint(cell);
+                return;
+            }
             if (!Interactive)
             {
                 // Someone watching sees it painted back, a cell at a time.
@@ -118,10 +141,22 @@ namespace Smartest.Minigames
 
             if (KeyInput.MousePressed())
                 for (int s = 0; s < _swatches.Length; s++)
-                    if (_swatchRects[s].Contains(m)) { _brush = PaintOf(s); MarkBrush(); return; }
+                    if (_swatchRects[s].Contains(m)) { PickBrush(s); return; }
+            Paint(CellAt(m));
+        }
 
-            int cell = CellAt(m);
-            if (cell < 0 || _painted[cell] == _brush) return;
+        /// <summary>A swatch clicked: by the player, or by the rule card's demo.</summary>
+        private void PickBrush(int s)
+        {
+            if (!CanMove) return;
+            _brush = PaintOf(s);
+            MarkBrush();
+        }
+
+        /// <summary>The brush on a cell (-1 off the canvas): the player's mouse, or the demo's hand.</summary>
+        private void Paint(int cell)
+        {
+            if (!CanMove || cell < 0 || _painted[cell] == _brush) return;
             _painted[cell] = _brush;
             _cells[cell].color = Paints[_brush];
 

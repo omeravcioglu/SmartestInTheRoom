@@ -141,6 +141,20 @@ namespace Smartest.Minigames
             }
             if (_stage < 2) return;
 
+            // The rule card's demo looks the tray over, then picks the one that went.
+            if (Demo)
+            {
+                if (IsDone || Elapsed - _askedAt < 0.45f) return;
+                int answer = 0;
+                for (int i = 0; i < _options.Length; i++) if (_options[i] == _items[_missing]) answer = i;
+                PointAt(Where(_optionViews[answer]));
+                if (Elapsed - _askedAt >= 0.8f)
+                {
+                    TapAt(Where(_optionViews[answer]));
+                    Pick(answer);
+                }
+                return;
+            }
             if (!Interactive)
             {
                 if (Elapsed - _askedAt > 1.2f) Reveal(-1);
@@ -153,16 +167,23 @@ namespace Smartest.Minigames
             for (int i = 0; i < _optionRects.Length; i++)
             {
                 if (!_optionRects[i].Contains(m)) continue;
-                Reveal(i);
-                if (_options[i] == _items[_missing])
-                {
-                    _label.text = "SPOT ON";
-                    _label.color = Palette.Green;
-                    Finish(false, Ms(Elapsed - _askedAt));
-                }
-                else Fail("THAT ONE'S STILL THERE");
+                Pick(i);
                 return;
             }
+        }
+
+        /// <summary>A choice clicked: by the player, or by the rule card's demo.</summary>
+        private void Pick(int i)
+        {
+            if (!CanMove) return;
+            Reveal(i);
+            if (_options[i] == _items[_missing])
+            {
+                _label.text = "SPOT ON";
+                _label.color = Palette.Green;
+                Finish(false, Ms(Elapsed - _askedAt));
+            }
+            else Fail("THAT ONE'S STILL THERE");
         }
 
         /// <summary>Mark the right choice (and a wrong pick).</summary>

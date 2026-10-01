@@ -23,6 +23,7 @@ namespace Smartest.Minigames
             public float CaughtAt;
             public RectTransform View;
             public Image Image;
+            public Image Glow;
         }
 
         private Fly[] _flies = new Fly[0];
@@ -31,6 +32,8 @@ namespace Smartest.Minigames
         private Rect _box;
         private int _caught;
         private TMP_Text _label;
+        private Vector2 _demoAt;   // the demo's mouse
+        private int _demoFly;      // the one the demo is after; negative for none yet
 
         protected override void Build()
         {
@@ -53,7 +56,7 @@ namespace Smartest.Minigames
 
             float w = Mathf.Min(1080f, size.x - 120f), h = size.y - 100f;
             var centre = new Vector2(0f, 20f);
-            UiKit.Box(Area, "Night", new Vector2(w, h), centre, Palette.Panel);
+            UiKit.Box(Area, "Night", new Vector2(w, h), centre, Palette.Ink);
             _box = new Rect(centre.x - w * 0.5f + _radius + 8f, centre.y - h * 0.5f + _radius + 8f,
                             w - 2f * (_radius + 8f), h - 2f * (_radius + 8f));
 
@@ -65,13 +68,19 @@ namespace Smartest.Minigames
                 // Frequencies that make the typical speed about `speed`.
                 var freq = new Vector2(speed / amp.x * RandomRange(0.6f, 1f), speed / amp.y * RandomRange(0.3f, 0.6f));
                 var phase = new Vector2(RandomRange(0f, Mathf.PI * 2f), RandomRange(0f, Mathf.PI * 2f));
-                var img = UiKit.Dot(Area, "Fly" + i, _radius * 2f, c, Palette.Accent);
-                _flies[i] = new Fly { Centre = c, Amp = amp, Freq = freq, Phase = phase, View = (RectTransform)img.transform, Image = img };
+                // A glow, and the fly in it; the glow is a little bigger than what you have to touch.
+                var fly = UiKit.Node(Area, "Fly" + i, Vector2.zero, c);
+                var glow = UiKit.Art(fly, "Glow", "glow", new Vector2(_radius, _radius) * 4.4f, Vector2.zero, Palette.Gold);
+                var img = UiKit.Art(fly, "Body", "firefly", new Vector2(_radius, _radius) * 2.4f, Vector2.zero);
+                _flies[i] = new Fly { Centre = c, Amp = amp, Freq = freq, Phase = phase, View = fly, Image = img, Glow = glow };
             }
 
             _label = UiKit.Label(Area, "Hint", "TOUCH THEM ALL", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
             Progress("CAUGHT", 0, n);
+            // The demo's hand starts in the middle of the box.
+            _demoAt = centre;
+            _demoFly = -1;
         }
 
         private Vector2 PathAt(in Fly f, float t) =>
@@ -81,6 +90,12 @@ namespace Smartest.Minigames
         {
             var cursor = Vector2.zero;
             bool haveCursor = CanAct && UiKit.LocalPoint(Area, KeyInput.MousePosition(), out cursor);
+            // The rule card's demo sweeps its own cursor through them; they're caught just the same.
+            if (Demo)
+            {
+                cursor = DemoSweep(dt);
+                haveCursor = true;
+            }
 
             for (int i = 0; i < _flies.Length; i++)
             {
@@ -104,18 +119,21 @@ namespace Smartest.Minigames
                 var clamped = new Vector2(Mathf.Clamp(p.x, _box.xMin, _box.xMax), Mathf.Clamp(p.y, _box.yMin, _box.yMax));
                 f.Push += clamped - p;
                 f.View.anchoredPosition = clamped;
+                // Each one glows on its own beat.
+                f.Glow.color = new Color(Palette.Gold.r, Palette.Gold.g, Palette.Gold.b, 0.7f + 0.3f * Mathf.Sin(Elapsed * 4f + f.Phase.x * 3f));
 
                 if (haveCursor && Vector2.Distance(cursor, clamped) <= _radius + 10f)
                 {
                     f.Caught = true;
                     f.CaughtAt = Elapsed;
                     f.Image.color = Palette.Green;
+                    f.Glow.color = Palette.Green;
                     _caught++;
                     Progress("CAUGHT", _caught, _flies.Length);
                 }
             }
 
-            if (!CanAct) return;
+            if (!CanMove) return;
             if (_caught == _flies.Length)
             {
                 _label.text = "GOT THEM ALL";
@@ -128,6 +146,29 @@ namespace Smartest.Minigames
                 _label.color = Palette.Red;
                 Finish(true, WorstMetric);
             }
+        }
+
+        /// <summary>
+        /// The rule card's demo: a beat, then after the nearest one still free, straight through
+        /// it and on to the next.
+        /// </summary>
+        private Vector2 DemoSweep(float dt)
+        {
+            if (_demoFly < 0 || _flies[_demoFly].Caught)
+            {
+                _demoFly = -1;
+                float nearest = float.MaxValue;
+                for (int i = 0; i < _flies.Length; i++)
+                {
+                    if (_flies[i].Caught) continue;
+                    float d = Vector2.Distance(_demoAt, _flies[i].View.anchoredPosition);
+                    if (d < nearest) { nearest = d; _demoFly = i; }
+                }
+            }
+            if (Elapsed >= 0.3f && _demoFly >= 0)
+                _demoAt = Vector2.MoveTowards(_demoAt, _flies[_demoFly].View.anchoredPosition, 420f * dt);
+            PointAt(_demoAt);
+            return _demoAt;
         }
     }
 }

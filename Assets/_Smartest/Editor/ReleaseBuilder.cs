@@ -29,6 +29,7 @@ namespace Smartest.EditorTools
         private const string MenuScenePath = "Assets/_Smartest/Scenes/Menu.unity";
         private const string GameScenePath = "Assets/_Smartest/Scenes/Game.unity";
         private const string LibraryPath = "Assets/_Smartest/Resources/RoundLibrary.asset";
+        private const string IconPath = "Assets/_Smartest/Art/AppIcon.png";
 
         [MenuItem("Tools/Smartest/Build Windows Release")]
         public static void BuildWindowsMenu()
@@ -41,6 +42,23 @@ namespace Smartest.EditorTools
                 return;
             }
             if (BuildWindows(out string folder)) EditorUtility.RevealInFinder(Path.Combine(folder, ExeName + ".exe"));
+        }
+
+        /// <summary>Makes Art/AppIcon.png the game's icon (the exe, the window, the taskbar).</summary>
+        [MenuItem("Tools/Smartest/Use App Icon")]
+        public static void UseAppIcon()
+        {
+            var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(IconPath);
+            if (icon == null) { Debug.LogError("[Release] No icon at " + IconPath); return; }
+            PlayerSettings.SetIcons(NamedBuildTarget.Unknown, new[] { icon }, IconKind.Any);
+            AssetDatabase.SaveAssets();
+            Debug.Log("[Release] App icon set from " + IconPath);
+        }
+
+        public static void UseAppIconBatch()
+        {
+            UseAppIcon();
+            EditorApplication.Exit(0);
         }
 
         public static void BuildWindowsBatch()
@@ -88,6 +106,9 @@ namespace Smartest.EditorTools
             foreach (var licence in ShipLicences.Files)
                 if (!File.Exists(licence)) problems.Add("A font licence is missing: " + licence);
 
+            var icons = PlayerSettings.GetIcons(NamedBuildTarget.Unknown, IconKind.Any);
+            if (icons == null || icons.Length == 0 || icons[0] == null)
+                warnings.Add("No app icon: the exe shows Unity's. Tools > Smartest > Use App Icon sets Art/AppIcon.png.");
             if (PlayerSettings.companyName == "DefaultCompany")
                 warnings.Add("Company Name is still DefaultCompany (Project Settings > Player). It names the save folder and shows in the file properties.");
             if (EditorUserBuildSettings.development)

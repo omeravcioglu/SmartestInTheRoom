@@ -83,11 +83,25 @@ namespace Smartest.Minigames
         protected override void OnTick(float dt)
         {
             if (Elapsed > 8f) Fail("TOO SLOW");
+
+            // The rule card's demo finds the lit box, crosses the gold line to its mirror and clicks it.
+            if (Demo && !IsDone)
+            {
+                int target = _targets[_found.Count];
+                float t = Elapsed - 0.5f - _found.Count * 1.1f;
+                if (t < 0f) return;
+                PointAt(Where(_cells[t < 0.55f ? Mirror(target) : target]));
+                if (t >= 0.9f)
+                {
+                    TapAt(Where(_cells[target]));
+                    OnCell(target);
+                }
+            }
         }
 
         private void OnCell(int index)
         {
-            if (!CanAct || _found.Contains(index)) return;
+            if (!CanMove || _found.Contains(index)) return;
 
             if (!_targets.Contains(index))
             {

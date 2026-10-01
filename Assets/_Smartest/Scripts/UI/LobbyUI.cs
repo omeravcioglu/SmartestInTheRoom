@@ -10,18 +10,15 @@ using UnityEngine.UI;
 namespace Smartest.UI
 {
     /// <summary>
-    /// The lobby: the join code big enough to read out on Discord, how people join (online,
-    /// Wi-Fi or this PC), and the seats — taken ones carry a token and a name, open ones wait
-    /// with a dashed outline. The host starts; everyone can leave. A pure view over
+    /// The lobby: the join code big enough to read out to friends, and the seats — taken ones
+    /// carry a token and a name, open ones wait with a dashed outline. The host starts;
+    /// everyone can leave. A pure view over
     /// <see cref="PlayerData.All"/> and <see cref="NetSession"/>; MenuUI decides when it's shown.
     /// </summary>
     public class LobbyUI : Panel
     {
         [Header("Lobby")]
-        [SerializeField] private TMP_Text seatsTaken;
         [SerializeField] private TMP_Text codeText;
-        [SerializeField] private TMP_Text modeSticker;
-        [SerializeField] private TMP_Text modeText;
         [SerializeField] private Button copyButton;
         [SerializeField] private TMP_Text countText;
         [SerializeField] private LobbySeat[] seats = new LobbySeat[0];
@@ -95,25 +92,6 @@ namespace Smartest.UI
             int count = players.Count;
 
             if (codeText != null) codeText.text = string.IsNullOrEmpty(code) ? "------" : code;
-            var mode = net != null ? net.CurrentMode : NetSession.Mode.None;
-            if (modeSticker != null)
-                modeSticker.text = mode == NetSession.Mode.Local ? "LOCAL" : mode == NetSession.Mode.Lan ? "WI-FI" : "ONLINE";
-            if (modeText != null)
-            {
-                switch (mode)
-                {
-                    case NetSession.Mode.Local:
-                        modeText.text = "Same PC only. A second instance joins with LOCAL.";
-                        break;
-                    case NetSession.Mode.Lan:
-                        modeText.text = "Friends on this Wi-Fi type this IP to join.";
-                        break;
-                    default:
-                        modeText.text = "Share this code. Friends can join from anywhere.";
-                        break;
-                }
-            }
-            if (seatsTaken != null) seatsTaken.text = $"{count} OF {max} SEATS TAKEN";
             if (countText != null) countText.text = $"{count} / {max}";
 
             // Track arrivals for the "just joined" note.
@@ -162,10 +140,9 @@ namespace Smartest.UI
             }
             if (hintText != null)
             {
+                // The host has the Start button; everyone else is told who they're waiting on.
                 if (_note != null && count != _noteCount) _note = null;
-                hintText.text = _note ?? (isHost
-                    ? (count <= 1 ? "You can start solo to test, or wait for friends." : $"{count}/{max} players. Start when everyone's in.")
-                    : $"{count}/{max} players. Waiting for the host…");
+                hintText.text = _note ?? (isHost ? string.Empty : "Waiting for the host…");
             }
         }
 
@@ -217,8 +194,6 @@ namespace Smartest.UI
             var name = Ink.Chip(root, "Lobby", "Lobby", TypeRole.Display, 46f, Palette.Ink, Palette.Paper, 0f,
                 new RectOffset(14, 14, 4, 2), caps: true);
             Ink.BoxOf(name).Pin(48f, 29f, new Vector2(0f, 1f));
-            lobby.seatsTaken = Ink.Label(root, "SeatsTaken", "1 OF 8 SEATS TAKEN", 12f);
-            lobby.seatsTaken.rectTransform.At(48f, 87f, 360f, 16f);
             var title = Ink.Headline(root, "Title", "Smartest in the Room", 70f, 4f, 40f).OneLine();
             title.alignment = TextAlignmentOptions.Midline;
             title.rectTransform.At(420f, 10f, 1080f, 110f);
@@ -238,16 +213,6 @@ namespace Smartest.UI
             var copy = Ink.Slab(root, "Copy", "Copy", Palette.PaperHi, Palette.Ink, 56f, 4f, 8f);
             copy.GetComponent<RectTransform>().At(48f, 424f, 220f, 84f);
             lobby.copyButton = copy;
-            lobby.modeSticker = Ink.Sticker(root, "Mode", "ONLINE", 24f, Palette.Gold, Palette.Ink, -3f);
-            Ink.BoxOf(lobby.modeSticker).Pin(296f, 466f, new Vector2(0f, 0.5f));
-            lobby.modeText = Ink.Text(root, "ModeText", "", TypeRole.Body, 30f, Palette.Ink, TextAlignmentOptions.TopLeft,
-                lineHeight: 1.4f);
-            lobby.modeText.fontStyle |= FontStyles.Bold;
-            lobby.modeText.rectTransform.At(48f, 536f, 640f, 90f);
-            var discord = Ink.Text(root, "Discord", "No in-game chat. Talk on Discord.", TypeRole.Body, 22f, Palette.Ink2,
-                TextAlignmentOptions.TopLeft);
-            discord.fontStyle |= FontStyles.Italic | FontStyles.Bold;
-            discord.rectTransform.At(48f, 640f, 640f, 32f);
 
             // Seats.
             Ink.Label(root, "PlayersLabel", "THE PLAYERS", 15f).rectTransform.At(800f, 176f, 400f, 20f);

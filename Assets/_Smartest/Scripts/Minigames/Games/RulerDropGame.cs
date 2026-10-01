@@ -31,6 +31,8 @@ namespace Smartest.Minigames
         private float _totalFallen;
         private RectTransform _ruler;
         private Image _rulerImage;
+        private RectTransform _fingerL, _fingerR;
+        private float _handY;
         private TMP_Text _label;
 
         protected override void Build()
@@ -63,8 +65,12 @@ namespace Smartest.Minigames
             for (int k = 1; k < 10; k++)
                 UiKit.Fill(_ruler, "Tick" + k, new Vector2(k % 5 == 0 ? 34f : 18f, 4f),
                     new Vector2(-RulerW * 0.5f + (k % 5 == 0 ? 21f : 13f), RulerH * 0.5f - k * RulerH / 10f), Palette.Ink);
-            // The hand it falls through, at the ruler's foot and drawn over it.
-            UiKit.Fill(Area, "Hand", new Vector2(RulerW + 80f, 12f), new Vector2(0f, _topY - RulerH * 0.5f + 4f), Palette.Ink);
+            // Finger and thumb, open either side of the ruler's foot; they pinch shut on a catch.
+            _handY = _topY - RulerH * 0.5f + 4f;
+            _fingerL = (RectTransform)UiKit.Art(Area, "Finger", "finger", new Vector2(64f, 30f), Vector2.zero).transform;
+            _fingerR = (RectTransform)UiKit.Art(Area, "Thumb", "finger", new Vector2(64f, 30f), Vector2.zero).transform;
+            _fingerR.localScale = new Vector3(-1f, 1f, 1f);
+            Pinch(false);
 
             _dropAt = _delays[0];
             _label = UiKit.Label(Area, "Hint", "CATCH IT WHEN IT DROPS", 26f, Palette.TextDim,
@@ -75,6 +81,9 @@ namespace Smartest.Minigames
         protected override void OnTick(float dt)
         {
             if (_drop >= _delays.Length) return;
+            // The rule card's demo: the hand waits beside the finger and thumb, and clicks on the catch below.
+            var hand = new Vector2(RulerW * 0.5f + 118f, _handY - 14f);
+            if (Demo) PointAt(hand);
 
             // Between drops: the caught ruler rests where it stopped, then goes back up.
             if (_caughtAt >= 0f)
@@ -83,6 +92,7 @@ namespace Smartest.Minigames
                 _caughtAt = -1f;
                 _fallen = 0f;
                 _ruler.anchoredPosition = new Vector2(0f, _topY);
+                Pinch(false);
                 _dropAt = Elapsed + _delays[_drop];
                 _label.text = "CATCH IT WHEN IT DROPS";
                 _label.color = Palette.TextDim;
@@ -104,13 +114,15 @@ namespace Smartest.Minigames
             bool catchIt = CanAct ? KeyInput.MousePressed() : (!Interactive && t >= 0.24f);
             if (catchIt)
             {
+                if (Demo) TapAt(hand);
                 _totalFallen += _fallen;
                 _caughtAt = Elapsed;
+                Pinch(true);
                 _label.text = Mathf.RoundToInt(_fallen) + " PX";
                 _label.color = Palette.Green;
                 _drop++;
                 Progress("CAUGHT", _drop, _delays.Length);
-                if (_drop >= _delays.Length && CanAct)
+                if (_drop >= _delays.Length && CanMove)
                 {
                     // Tenths of a pixel: whole pixels would tie, and a tie means a play-off.
                     Finish(false, Mathf.RoundToInt(_totalFallen * 10f));
@@ -118,6 +130,14 @@ namespace Smartest.Minigames
                 return;
             }
             if (_fallen > MaxFall && CanAct) Fail("DROPPED IT");
+        }
+
+        /// <summary>Open, with a gap either side of the ruler, or shut on it.</summary>
+        private void Pinch(bool shut)
+        {
+            float x = RulerW * 0.5f + (shut ? 30f : 44f);
+            _fingerL.anchoredPosition = new Vector2(-x, _handY);
+            _fingerR.anchoredPosition = new Vector2(x, _handY);
         }
 
         private void Fail(string why)

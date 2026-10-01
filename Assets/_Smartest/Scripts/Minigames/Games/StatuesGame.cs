@@ -16,7 +16,7 @@ namespace Smartest.Minigames
     public class StatuesGame : MinigameView
     {
         private const float Limit = 15f;
-        private const float RunnerR = 20f;
+        private const float Stride = 0.13f;
 
         private readonly List<float> _switches = new List<float>(); // times the light changes; GO first
         private float _speed;
@@ -61,9 +61,9 @@ namespace Smartest.Minigames
             UiKit.Box(Area, "Track", new Vector2(w, 90f), new Vector2(0f, _trackY), Palette.PanelRaised);
             _startX = -w * 0.5f + 40f;
             _finishX = w * 0.5f - 40f;
-            UiKit.Fill(Area, "Finish", new Vector2(14f, 82f), new Vector2(_finishX, _trackY), Palette.Accent);
+            UiKit.FinishLine(Area, "Finish", 80f, new Vector2(_finishX, _trackY));
             _x = _startX;
-            _runnerImage = UiKit.Dot(Area, "Runner", RunnerR * 2f, new Vector2(_x, _trackY), Palette.Accent);
+            _runnerImage = UiKit.Art(Area, "Runner", "stand", new Vector2(44f, 56f) * 1.25f, new Vector2(_x, _trackY));
             _runner = (RectTransform)_runnerImage.transform;
 
             _light = UiKit.Dot(Area, "Light", 150f, new Vector2(0f, 140f), Palette.Red);
@@ -92,13 +92,20 @@ namespace Smartest.Minigames
             _word.text = go ? "GO" : "STOP";
             _word.color = go ? Palette.Ink : Palette.OnRed;
 
-            // Someone watching sees a runner who stops a beat after the light does.
-            bool held = CanAct ? KeyInput.MouseHeld() : !Interactive && (go || since < 0.2f);
+            // Someone watching sees a runner who stops a beat after the light does. The rule card's
+            // demo also waits a beat for GO, and never holds before the first one.
+            bool held = CanAct ? KeyInput.MouseHeld()
+                : Demo ? Elapsed >= _switches[0] && (go ? since >= 0.25f : since < 0.25f)
+                : !Interactive && (go || since < 0.2f);
+            if (Demo) HoldAt(new Vector2(135f, 110f), held);
             // Before the first GO nothing counts: holding through the countdown isn't a false start.
             bool started = Elapsed >= _switches[0];
-            if (held && started) _x = Mathf.Min(_finishX, _x + _speed * dt);
+            bool running = held && started && _x < _finishX;
+            if (running) _x = Mathf.Min(_finishX, _x + _speed * dt);
             _runner.anchoredPosition = new Vector2(_x, _trackY);
-            if (!CanAct) return;
+            // Two strides while running; stock still when not.
+            UiKit.Dress(_runnerImage, !running ? "stand" : Mathf.FloorToInt(Elapsed / Stride) % 2 == 0 ? "run1" : "run2");
+            if (!CanMove) return;
 
             if (held && started && !go && since > _grace) { Fail("MOVED ON RED"); return; }
             if (_x >= _finishX)

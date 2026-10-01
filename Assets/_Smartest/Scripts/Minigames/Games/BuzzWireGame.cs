@@ -24,6 +24,10 @@ namespace Smartest.Minigames
         private bool _armed;
         private float _armedAt;
         private Vector2 _last;
+        private Vector2[] _demoRoute = new Vector2[0]; // the demo's way: the path's centre line, corner to corner
+        private int _demoNext;
+        private float _demoWait;
+        private Vector2 _demoAt;                        // the demo's mouse
 
         protected override void Build()
         {
@@ -93,6 +97,22 @@ namespace Smartest.Minigames
 
             _label = UiKit.Label(Area, "Hint", "GO TO START", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+
+            // The demo goes down the middle of the path: START, then every corner, to the gold end.
+            // Its hand starts low on the board, away from START.
+            if (Demo)
+            {
+                _demoRoute = new Vector2[runs * 2];
+                _demoRoute[0] = new Vector2(xs[0], ys[0]);
+                for (int i = 0; i < runs; i++)
+                {
+                    _demoRoute[i * 2 + 1] = new Vector2(xs[i + 1], ys[i]);
+                    if (i + 1 < runs) _demoRoute[i * 2 + 2] = new Vector2(xs[i + 1], ys[i + 1]);
+                }
+            }
+            _demoNext = 0;
+            _demoWait = 0f;
+            _demoAt = new Vector2(_start.center.x + 300f, bottom - 50f);
         }
 
         private void AddSegment(Vector2 a, Vector2 b, float w)
@@ -112,8 +132,9 @@ namespace Smartest.Minigames
 
         protected override void OnTick(float dt)
         {
-            if (!CanAct) return;
-            if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var p)) return;
+            Vector2 p;
+            if (Demo) p = DemoTrace(dt); // the rule card's demo plays it for real
+            else if (!CanAct || !UiKit.LocalPoint(Area, KeyInput.MousePosition(), out p)) return;
 
             if (!_armed)
             {
@@ -150,6 +171,26 @@ namespace Smartest.Minigames
                 Finish(false, Ms(Elapsed - _armedAt));
             }
             else if (Elapsed > Limit) Fail("TOO SLOW");
+        }
+
+        /// <summary>
+        /// The rule card's demo: a beat, over to START, a breath there, then along the middle of
+        /// the path at a careful pace, corner to corner, into the gold end.
+        /// </summary>
+        private Vector2 DemoTrace(float dt)
+        {
+            if (Elapsed >= 0.3f && Elapsed >= _demoWait && _demoNext < _demoRoute.Length)
+            {
+                var to = _demoRoute[_demoNext];
+                _demoAt = Vector2.MoveTowards(_demoAt, to, (_demoNext == 0 ? 600f : 420f) * dt);
+                if (_demoAt == to)
+                {
+                    if (_demoNext == 0) _demoWait = Elapsed + 0.25f;
+                    _demoNext++;
+                }
+            }
+            PointAt(_demoAt);
+            return _demoAt;
         }
 
         private void Fail(string why)

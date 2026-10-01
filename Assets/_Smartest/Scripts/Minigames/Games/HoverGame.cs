@@ -76,8 +76,8 @@ namespace Smartest.Minigames
             _zone = (RectTransform)_zoneImage.transform;
             _y = ZoneAt(0f);
             _dot = (RectTransform)UiKit.Dot(Area, "Dot", DotR * 2f, new Vector2(0f, _trackY + _y), Palette.Ink).transform;
-            // Someone already out watches the zone; they have no dot in it.
-            if (!Interactive) _dot.gameObject.SetActive(false);
+            // Someone already out watches the zone; they have no dot in it. The demo flies one.
+            if (!Interactive && !Demo) _dot.gameObject.SetActive(false);
 
             _label = UiKit.Label(Area, "Hint", "HOLD TO RISE", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
@@ -88,7 +88,10 @@ namespace Smartest.Minigames
 
         protected override void OnTick(float dt)
         {
-            bool held = CanAct && KeyInput.MouseHeld();
+            // The demo holds whenever the dot is sinking below the zone's middle.
+            bool held = CanAct ? KeyInput.MouseHeld()
+                : Demo && _started && ZoneAt(Elapsed - _startedAt) - _y - 0.25f * _v > 0f;
+            if (Demo) HoldAt(new Vector2(TrackW * 0.5f + 150f, _trackY - 40f), held);
             if (!_started && (held || Elapsed >= (Interactive ? SettleFor : WatchStart)))
             {
                 _started = true;
@@ -97,7 +100,7 @@ namespace Smartest.Minigames
             float t = _started ? Elapsed - _startedAt : 0f;
             float zone = ZoneAt(t);
             _zone.anchoredPosition = new Vector2(0f, _trackY + zone);
-            if (!CanAct || !_started) return;
+            if (!CanMove || !_started) return;
 
             float limit = TrackH * 0.5f - DotR - 4f;
             _acc += dt;

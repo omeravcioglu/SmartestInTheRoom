@@ -74,6 +74,16 @@ namespace Smartest.Minigames
                 return;
             }
 
+            // The rule card's demo sits out the red (and the gold fakes) and hits SPACE a beat after green.
+            if (Demo && _green && !turnedGreenNow && !IsDone && Elapsed - _greenShownAt >= 0.3f)
+            {
+                PressKey("SPACE");
+                _label.text = "GOOD";
+                _label.color = Palette.Accent;
+                Finish(false, Ms(Elapsed - _greenShownAt));
+                return;
+            }
+
             if (!CanAct) return;
             if (!KeyInput.SpacePressed()) return;
 

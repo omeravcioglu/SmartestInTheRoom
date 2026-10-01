@@ -102,11 +102,22 @@ namespace Smartest.Minigames
                 if (_label != null) { _label.text = "HOW MANY?"; _label.color = Palette.Text; }
             }
             if (_hidden && Elapsed - _flashFor > 8f) Fail("TOO SLOW");
+
+            // The rule card's demo takes a beat once the dots have gone, then clicks the count.
+            if (Demo && _hidden && !IsDone && Elapsed - _flashFor >= 0.35f)
+            {
+                PointAt(Where(_answers[_count]));
+                if (Elapsed - _flashFor >= 0.7f)
+                {
+                    TapAt(Where(_answers[_count]));
+                    OnAnswer(_count);
+                }
+            }
         }
 
         private void OnAnswer(int value)
         {
-            if (!CanAct || !_hidden) return;
+            if (!CanMove || !_hidden) return;
             if (value != _count)
             {
                 _answers[value].color = Palette.Red;

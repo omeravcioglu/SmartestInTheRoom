@@ -26,7 +26,8 @@ namespace Smartest.Tests
     ///
     /// Explicit: it takes a few minutes and writes files. Run it on purpose:
     ///   Unity.exe -batchmode -projectPath . -runTests -testPlatform PlayMode -testFilter ScreenshotTour
-    /// Pictures go to $SMARTEST_SHOTS, or Previews/ next to Assets.
+    /// Pictures go to $SMARTEST_SHOTS, or Previews/ next to Assets. To look at a few games
+    /// only, set $SMARTEST_TOUR_ONLY to their ids ("flap,goalie"): the tour stops after them.
     /// </summary>
     [Explicit("Renders every screen to PNG; run it on purpose.")]
     public class ScreenshotTour
@@ -40,6 +41,7 @@ namespace Smartest.Tests
             { "bullseye", 1f },     // the level-1 target shows for 2 s, then it's gone
             { "memory_boxes", 1f }, // the boxes go dark at 2.5 s, the very frame of the usual shot
             { "flash_point", 1.3f }, // the level-1 dot shows somewhere in 0.5-2.1 s, always at 1.3
+            { "traffic", 3.5f },    // cars drive in from off screen; by now some are at the crossing
         };
 
         private static float ShotAt(string game, float lead) =>
@@ -49,6 +51,7 @@ namespace Smartest.Tests
         private string _dir;
         private readonly HashSet<string> _taken = new HashSet<string>();
         private bool _everyGame;
+        private HashSet<string> _only;
 
         [UnitySetUp]
         public IEnumerator SetUp()
@@ -59,6 +62,13 @@ namespace Smartest.Tests
             _dir = Environment.GetEnvironmentVariable("SMARTEST_SHOTS");
             if (string.IsNullOrEmpty(_dir)) _dir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Previews"));
             Directory.CreateDirectory(_dir);
+            string only = Environment.GetEnvironmentVariable("SMARTEST_TOUR_ONLY");
+            _only = null;
+            if (!string.IsNullOrWhiteSpace(only))
+            {
+                _only = new HashSet<string>();
+                foreach (var id in only.Split(',')) _only.Add(id.Trim());
+            }
             if (NetSession.Instance != null) NetSession.Instance.LocalPlayerName = "Deniz";
             SceneManager.LoadScene(NetSession.MenuSceneName);
             yield return null;
@@ -164,6 +174,7 @@ namespace Smartest.Tests
                         {
                             _everyGame = true;
                             yield return EveryOtherGame(gs);
+                            if (_only != null) yield break; // just the games asked for
                         }
                         break;
 
@@ -225,7 +236,7 @@ namespace Smartest.Tests
             foreach (var entry in MinigameRegistry.All)
             {
                 string name = "22-level-" + entry.Id;
-                if (_taken.Contains(name)) continue;
+                if (_taken.Contains(name) || (_only != null && !_only.Contains(entry.Id))) continue;
                 // A level that ends by itself without input (Steady Hand's first-second grace
                 // runs out) is played again and photographed a moment before it ends.
                 float at = ShotAt(entry.Id, lead);

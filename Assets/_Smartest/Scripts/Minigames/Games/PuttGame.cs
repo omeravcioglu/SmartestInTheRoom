@@ -40,6 +40,7 @@ namespace Smartest.Minigames
         private TMP_Text _label;
         private float _acc;
         private float _nextAuto = 1f;
+        private float _demoFrom = -1f; // the demo: when it went for the ball
 
         protected override void Build()
         {
@@ -83,7 +84,7 @@ namespace Smartest.Minigames
 
             UiKit.Dot(Area, "Hole", HoleR * 2f, _hole, Palette.Ink);
             UiKit.Line(Area, "Pin", _hole, _hole + new Vector2(0f, 70f), 4f, Palette.Ink);
-            UiKit.Fill(Area, "Flag", new Vector2(34f, 22f), _hole + new Vector2(17f, 59f), Palette.Accent);
+            UiKit.Art(Area, "Flag", "pennant", new Vector2(34f, 22f), _hole + new Vector2(17f, 59f));
             _aim = UiKit.Line(Area, "Aim", _p, _p + Vector2.right, 5f, Palette.Ink2);
             _aim.gameObject.SetActive(false);
             _ballImage = UiKit.Dot(Area, "Ball", BallR * 2f, _p, Palette.PaperHi);
@@ -113,6 +114,7 @@ namespace Smartest.Minigames
             if (!_rolling)
             {
                 if (Interactive) Aim();
+                else if (Demo) DemoPutt();
                 else AutoPutt();
                 return;
             }
@@ -130,6 +132,40 @@ namespace Smartest.Minigames
             _rolling = true;
             _strokes++;
             Tries("STROKES", _maxStrokes - _strokes, _maxStrokes);
+        }
+
+        /// <summary>
+        /// The rule card's demo makes that putt the way a player does: on to the ball, press, draw
+        /// back away from the hole for half a second while the aim line shows it, let go.
+        /// </summary>
+        private void DemoPutt()
+        {
+            if (_strokes >= _maxStrokes) return;
+            const float press = 0.3f, pulled = 0.6f, letGo = 0.85f;
+            if (_demoFrom < 0f) _demoFrom = Elapsed + (_strokes == 0 ? 0.4f : 0f);
+            float t = Elapsed - _demoFrom;
+            if (t < press)
+            {
+                // A look at the green first, then on to the ball.
+                PointAt(t < 0f ? _p + new Vector2(160f, 0f) : _p);
+                return;
+            }
+            var to = _hole - _p;
+            float d = to.magnitude;
+            float speed = Mathf.Min(MaxPull * Power, Mathf.Sqrt(2f * Friction * (d + 40f)));
+            var pull = to / Mathf.Max(1f, d) * (speed / Power) * Mathf.SmoothStep(0f, 1f, (t - press) / (pulled - press));
+            UiKit.SetLine(_aim, _p, _p + pull * 0.9f);
+            _aim.gameObject.SetActive(pull.magnitude > 10f);
+            HoldAt(_p - pull, t < letGo);
+            if (t < letGo) return;
+
+            // Let go.
+            _aim.gameObject.SetActive(false);
+            _v = pull * Power;
+            _rolling = true;
+            _strokes++;
+            Tries("STROKES", _maxStrokes - _strokes, _maxStrokes);
+            _demoFrom = -1f;
         }
 
         private void Aim()

@@ -117,9 +117,36 @@ namespace Smartest.Minigames
                 }
             }
 
+            if (Demo) PlayDemo();
+
             if (!CanAct || !KeyInput.MousePressed()) return;
             if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var local)) return;
+            Click(local);
+        }
 
+        /// <summary>The rule card's demo: the hand goes to each dot as it comes up and clicks it a beat later.</summary>
+        private void PlayDemo()
+        {
+            for (int i = 0; i < _targets.Length; i++)
+            {
+                var t = _targets[i];
+                if (t.Popped || t.Gone) continue;
+                float age = Elapsed - t.Spawn;
+                if (age < 0.1f) return; // nothing up yet, or only just: nobody's that quick
+                PointAt(t.Pos);
+                if (age >= 0.35f)
+                {
+                    TapAt(t.Pos);
+                    Click(t.Pos);
+                }
+                return;
+            }
+        }
+
+        /// <summary>A click, the player's or the demo's: it pops the oldest live dot under it.</summary>
+        private void Click(Vector2 local)
+        {
+            if (!CanMove) return;
             // The oldest live dot under the cursor. A click on nothing costs nothing.
             for (int i = 0; i < _targets.Length; i++)
             {

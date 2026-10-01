@@ -73,7 +73,9 @@ namespace Smartest.Minigames
                 Exchange(sim, a, b);
             }
 
-            // The ball first, so the cups draw over it.
+            // The table the cups slide on, then the ball, so the cups draw over it.
+            float tableTop = _cupY - _cupSize.y * 0.5f + 12f;
+            UiKit.Box(Area, "Table", new Vector2(k * spacing + 40f, 54f), new Vector2(0f, tableTop - 27f), Palette.Panel);
             _ball = UiKit.Dot(Area, "Ball", 54f, BallSpot(), Palette.Accent);
             _cups = new Image[k];
             for (int c = 0; c < k; c++)
@@ -81,6 +83,7 @@ namespace Smartest.Minigames
                 int cup = c;
                 _cups[c] = UiKit.Cell(Area, "Cup" + c, _cupSize, new Vector2(_slotX[c], _cupY), Palette.Neutral,
                     () => OnCup(cup), out _, string.Empty, 30f);
+                UiKit.Dress(_cups[c], "cup");
             }
             SetCup(_ballCup, _slotX[_ballCup], _cupY + LiftHeight);
 
@@ -118,6 +121,8 @@ namespace Smartest.Minigames
             {
                 float up = t < ShowFor ? 1f : 1f - (t - ShowFor) / LowerFor;
                 SetCup(_ballCup, _slotX[_ballCup], _cupY + LiftHeight * Smooth(up));
+                // The rule card's demo puts the pointer on the ball, then follows its cup about.
+                if (Demo && t >= 0.4f) PointAt(Where(_ball));
                 return;
             }
             if (_ball.gameObject.activeSelf && !_revealed)
@@ -145,6 +150,7 @@ namespace Smartest.Minigames
                 float lift = Mathf.Sin(u * Mathf.PI) * ArcHeight;
                 SetCup(ca, Mathf.Lerp(_slotX[sw.SlotA], _slotX[sw.SlotB], u), _cupY + lift);
                 SetCup(cb, Mathf.Lerp(_slotX[sw.SlotB], _slotX[sw.SlotA], u), _cupY - lift);
+                if (Demo) PointAt(Where(_cups[_ballCup]));
                 return;
             }
 
@@ -154,6 +160,16 @@ namespace Smartest.Minigames
                 _shuffleEnd = t;
                 for (int c = 0; c < _cups.Length; c++) SetCup(c, _slotX[_slotOf[c]], _cupY);
                 _label.text = "WHICH CUP?";
+            }
+            // The demo clicks the cup it followed, a beat after the shuffle stops.
+            if (Demo && !_revealed)
+            {
+                PointAt(Where(_cups[_ballCup]));
+                if (t - _shuffleEnd >= 0.45f)
+                {
+                    TapAt(Where(_cups[_ballCup]));
+                    OnCup(_ballCup);
+                }
             }
             if (!Interactive && !_revealed && t - _shuffleEnd > 1.5f) Reveal();
             if (CanAct && t - _shuffleEnd > AnswerFor)
@@ -171,7 +187,7 @@ namespace Smartest.Minigames
 
         private void OnCup(int cup)
         {
-            if (!CanAct || _shuffleEnd < 0f) return;
+            if (!CanMove || _shuffleEnd < 0f) return;
             Reveal();
             if (cup == _ballCup)
             {

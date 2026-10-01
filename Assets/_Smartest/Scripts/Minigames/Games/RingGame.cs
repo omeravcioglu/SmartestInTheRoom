@@ -26,6 +26,7 @@ namespace Smartest.Minigames
         private float _hold;
         private float _startAt = -1f;
         private float _distSum, _timeSum;
+        private Vector2 _demoAt; // the demo's mouse
 
         protected override void Build()
         {
@@ -65,7 +66,12 @@ namespace Smartest.Minigames
             _label = UiKit.Label(Area, "Hint", "GET IN THE RING", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
             Place(0f);
+            // The demo's hand starts outside the ring, on the side where it will hold on.
+            _demoAt = DemoSpot(CentreAt(0f), RadiusAt(0f) + 150f);
         }
+
+        /// <summary>Where the demo keeps its cursor: this far from the middle, low on the right.</summary>
+        private static Vector2 DemoSpot(Vector2 c, float r) => c + new Vector2(0.8f, -0.6f) * r;
 
         private float RadiusAt(float t) => _base + _a1 * Mathf.Sin(_w1 * t + _p1) + _a2 * Mathf.Sin(_w2 * t + _p2);
 
@@ -85,12 +91,20 @@ namespace Smartest.Minigames
 
         protected override void OnTick(float dt)
         {
-            if (!Interactive && _startAt < 0f) { _startAt = WatchStart; _outerImage.color = Palette.Accent; }
+            // The demo waits for its own cursor to get in, like a player.
+            if (!Interactive && !Demo && _startAt < 0f) { _startAt = WatchStart; _outerImage.color = Palette.Accent; }
             float t = _startAt < 0f ? 0f : Mathf.Max(0f, Elapsed - _startAt);
             var (c, r) = Place(t);
 
-            if (!CanAct) return;
-            if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var local)) return;
+            Vector2 local;
+            if (Demo)
+            {
+                // The rule card's demo: a beat, into the band, then in and out with it as it breathes.
+                if (Elapsed >= 0.3f) _demoAt = Vector2.MoveTowards(_demoAt, DemoSpot(c, r + 5f * Mathf.Sin(Elapsed * 1.7f)), 500f * dt);
+                PointAt(_demoAt);
+                local = _demoAt;
+            }
+            else if (!CanAct || !UiKit.LocalPoint(Area, KeyInput.MousePosition(), out local)) return;
             float off = Mathf.Abs(Vector2.Distance(local, c) - r);
 
             if (_startAt < 0f)

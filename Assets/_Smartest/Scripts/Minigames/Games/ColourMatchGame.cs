@@ -97,10 +97,30 @@ namespace Smartest.Minigames
                 for (int i = 0; i < 4; i++) _pads[i].color = Colours[_padColour[i]];
                 _swatch.color = Colours[_prompts[_index]];
             }
+            // The rule card's demo waits just under the swatch for the first colour.
+            if (Demo && !DemoHand.Shown) PointAt(new Vector2(0f, -110f));
             if (!_showing) return;
 
             if (!CanAct)
             {
+                // The demo takes a beat to see the colour, moves to its pad and clicks it.
+                if (Demo)
+                {
+                    int match = 0;
+                    for (int i = 0; i < 4; i++) if (_padColour[i] == _prompts[_index]) match = i;
+                    if (Elapsed - _showAt >= 0.3f) PointAt(_spots[match]);
+                    if (Elapsed - _showAt < 0.55f) return;
+                    TapAt(_spots[match]);
+                    _reactionSum += Elapsed - _showAt;
+                    Next();
+                    if (_index >= _prompts.Length)
+                    {
+                        _label.text = "SHARP EYES";
+                        _label.color = Palette.Green;
+                        Finish(false, Ms(_reactionSum));
+                    }
+                    return;
+                }
                 if (Elapsed - _showAt >= 0.45f) Next(); // someone watching sees a steady pace
                 return;
             }

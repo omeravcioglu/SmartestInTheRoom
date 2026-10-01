@@ -18,6 +18,8 @@ namespace Smartest.Minigames
         private Vector2 _drift;
         private float _radius;
         private float _visibleFor;
+        private Vector2 _demoAt;    // the demo's mouse
+        private float _demoStill;   // how long the demo has been on its spot
 
         protected override void Build()
         {
@@ -44,6 +46,10 @@ namespace Smartest.Minigames
 
             _label = UiKit.Label(Area, "Hint", "CLICK THE CENTRE", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
+
+            // The demo's hand starts low in the middle, wherever the target turns up.
+            _demoAt = new Vector2(0f, -170f);
+            _demoStill = 0f;
         }
 
         private Vector2 RandomDrift() => new Vector2(RandomRange(-70f, 70f), RandomRange(-50f, 50f));
@@ -67,10 +73,32 @@ namespace Smartest.Minigames
             }
             if (Elapsed > _visibleFor + 0.6f) { Fail("GONE"); return; }
 
+            // The rule card's demo: a beat to spot it, a quick move onto the middle (a hair off,
+            // as a real hand is), a moment to settle, then the click.
+            if (Demo)
+            {
+                var aim = c + new Vector2(3f, -2f);
+                if (Elapsed >= 0.3f) _demoAt = Vector2.MoveTowards(_demoAt, aim, 600f * dt);
+                PointAt(_demoAt);
+                _demoStill = Vector2.Distance(_demoAt, aim) < 1f ? _demoStill + dt : 0f;
+                if (_demoStill >= 0.25f)
+                {
+                    TapAt(_demoAt);
+                    Shoot(_demoAt, c);
+                }
+                return;
+            }
+
             if (!CanAct || !KeyInput.MousePressed()) return;
             if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var local)) return;
+            Shoot(local, c);
+        }
 
-            float d = Vector2.Distance(local, c);
+        /// <summary>A click, the player's or the demo's: inside the target it scores how far off the centre it was.</summary>
+        private void Shoot(Vector2 at, Vector2 c)
+        {
+            if (!CanMove) return;
+            float d = Vector2.Distance(at, c);
             if (d > _radius) { Fail("MISSED"); return; }
 
             _label.text = Mathf.RoundToInt(d) + " px off";

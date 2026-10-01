@@ -16,6 +16,7 @@ namespace Smartest.Minigames
 
         private Image[] _cards = new Image[0];
         private TMP_Text[] _faces = new TMP_Text[0];
+        private GameObject[] _backs = new GameObject[0];
         private int[] _valueOf = new int[0];
         private bool[] _matched = new bool[0];
         private float _preview;
@@ -62,6 +63,7 @@ namespace Smartest.Minigames
 
             _cards = new Image[n];
             _faces = new TMP_Text[n];
+            _backs = new GameObject[n];
             _valueOf = values;
             _matched = new bool[n];
             for (int i = 0; i < n; i++)
@@ -70,6 +72,9 @@ namespace Smartest.Minigames
                 int card = i;
                 _cards[i] = UiKit.Cell(Area, "Card" + i, new Vector2(w, h), origin + new Vector2(c * (w + gap), -r * (h + gap)),
                     Palette.PanelRaised, () => OnCard(card), out _faces[i], values[i].ToString(), 40f);
+                // The back of the card: a gold star on ink.
+                _backs[i] = UiKit.Marker(_cards[i].transform, "Back", UiKit.Mark.Star, Mathf.Min(w, h) * 0.5f, Vector2.zero, Palette.Gold).gameObject;
+                _backs[i].SetActive(false);
             }
 
             _label = UiKit.Label(Area, "Hint", "REMEMBER THEM", 26f, Palette.TextDim,
@@ -92,17 +97,35 @@ namespace Smartest.Minigames
                 _turnBackAt = -1f;
             }
             if (CanAct && Elapsed > _limit) Fail("TOO SLOW");
+
+            // The rule card's demo remembers every card: the first one left, then its match, a card a beat.
+            if (Demo && _hidden && !IsDone && Elapsed - _preview >= 0.35f)
+            {
+                int card = -1;
+                for (int i = 0; i < _cards.Length && card < 0; i++)
+                    if (!_matched[i] && i != _first && (_first < 0 || _valueOf[i] == _valueOf[_first])) card = i;
+                if (card < 0) return;
+                int turned = (_pairs - _pairsLeft) * 2 + (_first >= 0 ? 1 : 0);
+                PointAt(Where(_cards[card]));
+                if (Elapsed - _preview >= 0.7f + turned * 0.5f)
+                {
+                    TapAt(Where(_cards[card]));
+                    OnCard(card);
+                }
+            }
         }
 
         private void FaceDown(int i)
         {
             _faces[i].text = string.Empty;
+            _backs[i].SetActive(true);
             _cards[i].color = Palette.Ink; // a card back: nothing like a face-up card
         }
 
         private void FaceUp(int i)
         {
             _faces[i].text = _valueOf[i].ToString();
+            _backs[i].SetActive(false);
             _cards[i].color = Palette.PanelRaised;
         }
 
@@ -110,7 +133,7 @@ namespace Smartest.Minigames
         {
             // Not during the preview, not while a wrong pair is still showing, not a card
             // already turned up.
-            if (!CanAct || !_hidden || _turnBackAt >= 0f || _matched[card] || card == _first) return;
+            if (!CanMove || !_hidden || _turnBackAt >= 0f || _matched[card] || card == _first) return;
 
             FaceUp(card);
             if (_first < 0) { _first = card; return; }

@@ -95,10 +95,12 @@ namespace Smartest.Minigames
             }
 
             _y = 0f;
-            _birdImage = UiKit.Dot(world, "Bird", BirdR * 2f, new Vector2(BirdX, _y), Palette.Accent);
+            // Drawn a little bigger than the body it flies with: the beak and tail are for show.
+            _birdImage = UiKit.Art(world, "Bird", "bird", new Vector2(48f, 40f) * (BirdR / 15f), new Vector2(BirdX, _y));
+            UiKit.PivotOn(_birdImage, "bird", new Vector2(22f, 21f));
             _bird = (RectTransform)_birdImage.transform;
-            // Someone already out watches the course; they have no bird in it.
-            if (!Interactive) _bird.gameObject.SetActive(false);
+            // Someone already out watches the course; they have no bird in it. The demo flies one.
+            if (!Interactive && !Demo) _bird.gameObject.SetActive(false);
 
             _label = UiKit.Label(Area, "Hint", "CLICK TO FLAP", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
@@ -120,11 +122,8 @@ namespace Smartest.Minigames
         {
             if (!Interactive && !_flying) { _flying = true; _startedAt = 0f; }
 
-            if (CanAct && KeyInput.MousePressed())
-            {
-                if (!_flying) { _flying = true; _startedAt = Elapsed; }
-                _vy = _flap;
-            }
+            if (CanAct && KeyInput.MousePressed()) Flap();
+            if (Demo) PlayDemo();
 
             if (!_flying)
             {
@@ -141,7 +140,7 @@ namespace Smartest.Minigames
                 _tops[i].anchoredPosition = new Vector2(x, _tops[i].anchoredPosition.y);
                 _bottoms[i].anchoredPosition = new Vector2(x, _bottoms[i].anchoredPosition.y);
             }
-            if (!CanAct) return;
+            if (!CanMove) return;
 
             _acc += dt;
             while (_acc >= PhysicsStep)
@@ -151,6 +150,8 @@ namespace Smartest.Minigames
                 _y += _vy * PhysicsStep;
             }
             _bird.anchoredPosition = new Vector2(BirdX, _y);
+            // Nose up on a flap, down into a dive.
+            _bird.localRotation = Quaternion.Euler(0f, 0f, Mathf.Clamp(_vy / MaxFall * 45f, -60f, 30f));
 
             int passed = 0;
             for (int i = 0; i < _gapY.Length; i++) if (WallX(i, t) + WallW * 0.5f < BirdX - BirdR) passed++;
@@ -179,9 +180,37 @@ namespace Smartest.Minigames
             }
         }
 
+        /// <summary>A click, the player's or the demo's: the first one takes off, every one flaps.</summary>
+        private void Flap()
+        {
+            if (!CanMove) return;
+            if (!_flying) { _flying = true; _startedAt = Elapsed; }
+            _vy = _flap;
+        }
+
+        /// <summary>
+        /// The rule card's demo: a flap whenever the bird has sunk a little below the middle of
+        /// the next gap (the first once the hand has been seen). The hand taps beside the bird
+        /// rather than on it: anywhere will do.
+        /// </summary>
+        private void PlayDemo()
+        {
+            float t = Elapsed - _startedAt;
+            int next = 0;
+            while (next < _gapY.Length - 1 && WallX(next, t) + WallW * 0.5f < BirdX - BirdR) next++;
+            var spot = new Vector2(BirdX + 200f, -100f);
+            if (Elapsed >= 0.3f && _vy < 0f && _y < _gapY[next] - 30f)
+            {
+                TapAt(spot);
+                Flap();
+            }
+            else PointAt(spot);
+        }
+
         private void Crash()
         {
             _birdImage.color = Palette.Red;
+            _bird.localRotation = Quaternion.Euler(0f, 0f, -80f);
             Fail("CRASHED");
         }
 

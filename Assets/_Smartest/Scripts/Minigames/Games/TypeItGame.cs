@@ -57,7 +57,7 @@ namespace Smartest.Minigames
 
         private void OnSubmit(string text)
         {
-            if (_submitted || !CanAct) return;
+            if (_submitted || !CanMove) return;
             _submitted = true;
             if (string.Equals(text.Trim(), _word, System.StringComparison.Ordinal))
             {
@@ -71,6 +71,24 @@ namespace Smartest.Minigames
         protected override void OnTick(float dt)
         {
             if (Elapsed > 10f && !IsDone) Fail("TOO SLOW");
+            if (!Demo || IsDone || _submitted || _field == null) return;
+
+            // The rule card's demo reads the word, types it into the field a letter at a time,
+            // then presses ENTER, which submits it the way the field's own ENTER does.
+            int typed = _field.text.Length;
+            bool all = typed >= _word.Length;
+            if (Elapsed < 0.9f + typed * 0.3f + (all ? 0.3f : 0f)) return;
+            if (!all)
+            {
+                char c = _word[typed];
+                PressKey(c == ' ' ? "SPACE" : c.ToString());
+                _field.text = _word.Substring(0, typed + 1);
+            }
+            else
+            {
+                PressKey("ENTER");
+                _field.onSubmit.Invoke(_field.text);
+            }
         }
 
         protected override void OnTeardown()

@@ -33,6 +33,7 @@ namespace Smartest.Minigames
         private bool _on;
         private float _startAt = -1f;
         private float _distSum, _timeSum;
+        private Vector2 _demoAt; // the demo's mouse
 
         protected override void Build()
         {
@@ -79,6 +80,8 @@ namespace Smartest.Minigames
             _label = UiKit.Label(Area, "Hint", "GET ON THE MARKED BALL", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
             PlaceAll(0f);
+            // The demo's hand starts on the far side of your ball from the first look-alike.
+            _demoAt = -_decoyDir[0] * 150f;
         }
 
         private Vector2 BallAt(float moving)
@@ -105,17 +108,20 @@ namespace Smartest.Minigames
 
         protected override void OnTick(float dt)
         {
-            if (!Interactive && _startAt < 0f) _startAt = WatchStart;
+            // The demo waits for its own cursor to get on, like a player.
+            if (!Interactive && !Demo && _startAt < 0f) _startAt = WatchStart;
             float moving = _startAt < 0f ? 0f : Mathf.Max(0f, Elapsed - _startAt);
             var c = PlaceAll(moving);
             if (!_keepMark && moving > 0f && _mark.gameObject.activeSelf) _mark.gameObject.SetActive(false);
 
-            if (!CanAct)
+            Vector2 local;
+            if (Demo) local = DemoMouse(c, dt);
+            else if (!CanAct)
             {
                 if (_startAt >= 0f && moving >= _hold) Finish(false, 0);
                 return;
             }
-            if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var local)) return;
+            else if (!UiKit.LocalPoint(Area, KeyInput.MousePosition(), out local)) return;
             float d = Vector2.Distance(local, c);
 
             if (!_on)
@@ -151,6 +157,18 @@ namespace Smartest.Minigames
                 // Tenths of a pixel: whole pixels would tie, and a tie means a play-off.
                 Finish(false, Mathf.RoundToInt(_distSum / Mathf.Max(0.001f, _timeSum) * 10f));
             }
+        }
+
+        /// <summary>
+        /// The rule card's demo plays it as a player who never loses track: a beat, onto the
+        /// marked ball, then after it alone while the look-alikes swing across.
+        /// </summary>
+        private Vector2 DemoMouse(Vector2 c, float dt)
+        {
+            var aim = c + new Vector2(8f * Mathf.Sin(Elapsed * 1.3f), 6f * Mathf.Sin(Elapsed * 1.9f + 0.5f));
+            if (Elapsed >= 0.25f) _demoAt = Vector2.MoveTowards(_demoAt, aim, 550f * dt);
+            PointAt(_demoAt);
+            return _demoAt;
         }
 
         private void Fail(string why)

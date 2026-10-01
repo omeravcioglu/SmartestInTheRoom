@@ -131,9 +131,13 @@ namespace Smartest.Minigames
 
             if (!Interactive)
             {
-                // Someone watching sees every note hit dead on.
+                // Someone watching sees every note hit dead on; the rule card's demo shows each key too.
                 for (int i = 0; i < _notes.Count; i++)
-                    if (!_notes[i].Done && Elapsed >= _notes[i].Time) Judge(i, _notes[i].Lane);
+                {
+                    if (_notes[i].Done || Elapsed < _notes[i].Time) continue;
+                    if (Demo) PressKey(Keys[_notes[i].Lane]);
+                    Judge(i, _notes[i].Lane);
+                }
                 return;
             }
             if (!CanAct) return;
@@ -186,7 +190,7 @@ namespace Smartest.Minigames
             _hit++;
             Progress("NOTES", _hit, _notes.Count);
             if (Interactive) Sounds.Play(Sounds.Kind.Tick);
-            if (_hit < _notes.Count || !CanAct) return;
+            if (_hit < _notes.Count || !CanMove) return;
             _label.text = "IN THE GROOVE";
             _label.color = Palette.Green;
             Finish(false, Ms(_errorSum));

@@ -65,11 +65,23 @@ namespace Smartest.Minigames
         protected override void OnTick(float dt)
         {
             if (Elapsed > 12f) Fail("TOO SLOW");
+
+            // The rule card's demo reads the numbers, then clicks them smallest first, a tile a beat.
+            if (Demo && !IsDone && Elapsed >= 0.6f)
+            {
+                int next = _order[_index];
+                PointAt(Where(_tiles[next]));
+                if (Elapsed >= 0.95f + _index * 0.5f)
+                {
+                    TapAt(Where(_tiles[next]));
+                    OnTile(next);
+                }
+            }
         }
 
         private void OnTile(int index)
         {
-            if (!CanAct) return;
+            if (!CanMove) return;
             // A second click on a tile that's already sorted (a double-click, say) is not a
             // wrong answer — Memory Boxes and Mirror ignore it the same way.
             for (int i = 0; i < _index; i++) if (_order[i] == index) return;

@@ -31,6 +31,7 @@ namespace Smartest.Minigames
         private int _thrown;
         private float _distSum;
         private float _nextAuto = 1.5f;
+        private Vector2 _demoAim = new Vector2(280f, -120f); // the demo's mouse, off the board to start with
 
         protected override void Build()
         {
@@ -55,9 +56,8 @@ namespace Smartest.Minigames
             float[] radii = { BoardR, BoardR * 0.82f, BoardR * 0.64f, BoardR * 0.46f, BoardR * 0.2f, BoardR * 0.09f };
             for (int i = 0; i < rings.Length; i++) UiKit.Dot(Area, "Ring" + i, radii[i] * 2f, _board, rings[i]);
 
-            _reticleImage = UiKit.Dot(Area, "Aim", 30f, _board, Palette.Blue);
+            _reticleImage = UiKit.Art(Area, "Aim", "crosshair", new Vector2(40f, 40f), _board, Palette.Blue);
             _reticle = (RectTransform)_reticleImage.transform;
-            UiKit.Dot(_reticle, "Pip", 10f, Vector2.zero, Palette.PaperHi);
             _label = UiKit.Label(Area, "Hint", "HOLD TO STEADY, LET GO TO THROW", 26f, Palette.TextDim,
                 new Vector2(size.x - 60f, 40f), new Vector2(0f, -(size.y * 0.5f - 30f)));
             Tries("DARTS", Darts, Darts);
@@ -83,10 +83,12 @@ namespace Smartest.Minigames
 
             Vector2 aim;
             if (CanAct && UiKit.LocalPoint(Area, KeyInput.MousePosition(), out var m)) aim = m;
+            else if (Demo) aim = _demoAim = Vector2.MoveTowards(_demoAim, _board, 500f * dt); // the rule card's demo brings its mouse to the bull
             else aim = _board; // someone watching: aiming dead centre, still swaying
 
             // Someone watching sees a steady half-second hold before each throw.
             bool held = CanAct ? KeyInput.MouseHeld() : !Interactive && Elapsed > _nextAuto - 0.5f && Elapsed < _nextAuto;
+            if (Demo) HoldAt(aim, held); // the demo's hand is its mouse, button down for that hold
             if (held && !_holding) { _holding = true; _heldAt = Elapsed; }
 
             var at = aim + Wobble(Elapsed) * SwayNow();
@@ -102,13 +104,13 @@ namespace Smartest.Minigames
             Tries("DARTS", Darts - _thrown, Darts);
             if (!Interactive) _nextAuto = Elapsed + 1.5f;
             // Blue shows on the ink rings and the paper ones alike.
-            UiKit.Dot(Area, "Dart" + _thrown, 16f, at, Palette.Blue);
+            UiKit.Art(Area, "Dart" + _thrown, "dart", new Vector2(24f, 24f), at, Palette.Blue);
             _reticle.SetAsLastSibling();
             float d = Vector2.Distance(at, _board);
             if (d > BoardR && CanAct) { Fail("MISSED THE BOARD"); return; }
             _distSum += d;
             _label.text = Mathf.RoundToInt(d) + " FROM THE BULL";
-            if (_thrown >= Darts && CanAct)
+            if (_thrown >= Darts && CanMove)
             {
                 _label.color = Palette.Green;
                 // Tenths of a pixel: whole pixels would tie, and a tie means a play-off.
