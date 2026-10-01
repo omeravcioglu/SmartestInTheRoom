@@ -8,18 +8,19 @@ First to 100 points wins. 1–8 players online. No in-game chat (Discord). All c
 
 ## What the game is now
 
-A match deals a question, then two minigames, then a question again, until somebody reaches
-100 (`minigamesPerQuestion`; 1 = strictly one of each):
+**A match is minigames only**, one after another, until somebody reaches 100.
 
-**Social rounds (20).** Everyone answers the same question at the same time and the payoff
-depends on what the rest of the room did. Red/Green, Yes/No, or a number from 1–10. One short
-rule under the question, never on a button. Five of them (Lowest Unique, Two Thirds, The Pot,
-Charity, Sus) only work with three or more players, so two-player matches are never dealt them.
-
-**Minigames (54).** Everyone plays the same level simultaneously. Fail and you're out of that
+**Minigames (69; the full list with every rule is `MINIGAMES.md`).** Everyone plays the same level simultaneously. Fail and you're out of that
 minigame. Levels 1–2 are warm-ups: clear one and you play on. From level 3, if nobody fails,
 the slowest goes. If everyone fails, the level comes back harder. Last one standing wins. 1st +20, 2nd +10, 3rd +5, last −5 — all three numbers live on
 GameConfig.
+
+**Question rounds (20) — switched off, 29 Sep.** Playtesters found the Red/Green questions not
+fun, so `GameConfig.questionRounds` is off and the deck deals none. Nothing was deleted: the
+rounds, their resolvers, assets, UI and tests are all still in place, and switching it back on
+brings them back (dealt between minigames, `minigamesPerQuestion` to one question). For the
+record: everyone answers the same question at once, the payoff depends on what the room did,
+and five of them only work with three or more players.
 
 Flow per challenge:
 
@@ -30,6 +31,28 @@ minigame  RoundIntro -> (Play -> LevelResult)* -> Reveal -> Scoring
 
 Nothing after Scoring changed: the 100-point check, the tie-break, the scoreboard and the
 winner screen are the same as before.
+
+## Plan: more minigames (29 Sep)
+
+With the questions gone, minigames are the whole game, so two things matter: more games of the
+kinds playtesters liked, and more sense of playing *together* (today everyone plays the same
+level side by side and only sees who's done or out).
+
+**A. More of what works: no new tech, each game one file. Done 29 Sep: fifteen games, see
+*Fifteen more minigames* below.** Trace and Orbit were dropped for Herd and Pop the Lock
+(Orbit was too close to Chase and Ring); Tightrope became a walker you balance instead of a
+ball on a beam; What's Missing asks *which* one went, not where.
+
+**B. See each other (needs a small networking addition).** A live position stream (a few updates
+a second per player) so the race games show everyone's marker: Buzz Wire, Road, Statues, Chase
+become visible races, and the last two play a head-to-head.
+
+**C. Shared-arena games (needs the host to simulate a small world from players' inputs).**
+Bumper Dots (push each other off the edge), King of the Hill (hold the shrinking gold zone),
+Hot Potato (pass the bomb by touching someone). The biggest step, and the most party-like.
+
+**Alongside:** after each playtest, tune the ramps and retire what isn't fun; the reading-heavy
+ones (Stroop, Quick Math, Type It) are the first candidates.
 
 ## Architecture
 
@@ -69,8 +92,9 @@ automatically. `GameState`, `GameUI`, `RoundDeck` and `SceneBuilder` are not tou
 `minigamePlacePoints` (default 20/10/5), `minigameLastPlacePoints` (−5),
 `minigameSoloClearPoints`, `minigameSoloLevels`, `minigameIntroSeconds`,
 `minigameLeadInSeconds`, `levelResultSeconds`, `minigameMaxLevels`,
-`minigameWarmUpLevels` (2; 0 cuts the slowest from level one), `alternateSocialAndMinigame`,
-`minigamesPerQuestion` (2), plus the existing round timings and `targetScore`.
+`minigameWarmUpLevels` (2; 0 cuts the slowest from level one), `questionRounds` (off),
+`alternateSocialAndMinigame` and `minigamesPerQuestion` (both only matter with questions on),
+plus the existing round timings and `targetScore`.
 
 ## Next time you open Unity
 
@@ -78,10 +102,11 @@ automatically. `GameState`, `GameUI`, `RoundDeck` and `SceneBuilder` are not tou
 2. **Tools ▸ Smartest ▸ Clean Up Retired Files** — the retired code is already gone; this now
    only offers the 16 unused pre-rewrite voice files (`<key>.mp3` without a number).
 3. **Tools ▸ Smartest ▸ Build Scenes** — keeps every generated file in step with the code (the
-   74 challenge assets, prefabs and both scenes). A new minigame is only dealt once this has
-   made its asset (last run 28 Sep, after the 34 new ones).
-4. **Window ▸ General ▸ Test Runner** — EditMode ▸ Run All (158) and PlayMode ▸ Run All.
+   89 challenge assets, prefabs and both scenes). A new minigame is only dealt once this has
+   made its asset (last run 29 Sep, after the 15 new ones).
+4. **Window ▸ General ▸ Test Runner** — EditMode ▸ Run All (159) and PlayMode ▸ Run All.
 5. Play from `Menu.unity`. Two instances (or two PCs) to see a real elimination.
+6. To ship: **Tools ▸ Smartest ▸ Build Windows Release** (see *Publishing* below).
 
 ## Still unverified
 
@@ -92,7 +117,9 @@ automatically. `GameState`, `GameUI`, `RoundDeck` and `SceneBuilder` are not tou
 - Minigame feel. Every level ramp is a first draft, meant to be tuned by playing. Hiding the
   level until GO (see below) made the memory and flash games noticeably harder than before.
 
-All 150 voice lines are recorded and wired (the 34 new minigame intros on 28 Sep). New lines
+150 of the 165 voice lines are recorded and wired. The 15 intros for the 29 Sep minigames are
+written (`VoiceScript.MinigameIntros`) but not recorded, so those games start silently until
+they are; recording spends ElevenLabs credits. New lines
 record from Tools ▸ Smartest ▸ Voice Studio ▸ Record missing, or without opening Unity:
 `Unity.exe -batchmode -projectPath . -executeMethod Smartest.EditorTools.VoiceStudioWindow.RecordMissingBatch -quit`
 (same saved key, voice and settings; records only what's missing, then wires it in).
@@ -106,6 +133,86 @@ record from Tools ▸ Smartest ▸ Voice Studio ▸ Record missing, or without o
   numbers and negatives instead, which is the same skill and easier to read.
 - Grid puzzles are now drawn at runtime by each minigame rather than by the old shared
   `PuzzleGridView`, which is why that component is retired.
+
+## Publishing
+
+**Tools ▸ Smartest ▸ Build Windows Release** (`Editor/ReleaseBuilder.cs`; headless:
+`-executeMethod Smartest.EditorTools.ReleaseBuilder.BuildWindowsBatch -quit`) checks the project
+first and refuses to build if: the build scenes aren't exactly Menu then Game, a registered
+minigame has no round asset (run Build Scenes), or a font licence file is missing. It warns
+about a default company name and unrecorded voice lines. Then it builds a non-development
+player into a new folder, `Build/Release/SmartestInTheRoom-<version>-win64/` (never over an
+older one), moves Burst's debug symbols out to `Build/Release/_symbols/`, and writes a README.
+Every standalone build, this one or File ▸ Build, gets a `Licenses/` folder with the four SIL
+OFL texts (Archivo, Atkinson Hyperlegible Next and Mono, Liberation Sans), which the font
+licence asks for.
+
+**Release candidate, 29 Sep:** `Build/Release/SmartestInTheRoom-0.1.0-win64/` (116.5 MB, Mono,
+all 69 minigames). It launches cleanly; nobody has played it on two machines yet, which is what
+it's for. An earlier build from the same evening is under `Build/Release/_superseded/`, and the old
+dev build is still loose in `Build/`. It predates the HUD and art pass on the 49 newer minigames
+(started later the same evening): once that has landed and Build Scenes has run, build again.
+
+Done 29 Sep: product name "Smartest in the Room" (it was "SmartestInTheRoom"); the template's
+`SampleScene` taken out of the build, and Build Scenes no longer keeps scenes from outside
+`_Smartest`; the front page no longer advertises question rounds while they're off (a
+Minigames box and a Knockout box instead).
+
+Still open before a public release:
+- **Two machines.** Nothing has been played across two PCs yet; only the solo host loop is
+  tested. Play a full match with 3–4 people, over Relay and over LAN.
+- **Unity Cloud.** Relay/Lobby must be enabled for this project in the Unity Cloud dashboard,
+  and the project linked, or online hosting fails (LAN and same-PC modes don't need it).
+- **Company name** (Player settings; still DefaultCompany) and a **version number** for the
+  release (0.1.0 now).
+- **ElevenLabs licence.** A paid ElevenLabs plan is what allows commercial use of the voice.
+  Check the plan the clips were made on before selling the game.
+- **Icon and store art.** The build uses Unity's default icon; Steam and itch.io need a capsule
+  image and screenshots.
+- **Playtest tuning** of the new games' ramps, and a design pass on anything that isn't fun.
+- **Version control.** The project isn't in git; put it in before release so a build can be
+  traced to its code.
+
+## Fifteen more minigames — 29 Sep 2026
+
+Plan A, built. Each is still one file, but these reach further than the earlier ones: the first
+drag-and-release games, real physics, a maze generator, a crowd to steer.
+
+| Game | What you do | Out when | Ranked by |
+|---|---|---|---|
+| Juggle | Click balls to bat them up: two, then three, and they knock into each other | a ball touches the floor | closest any ball came to the floor |
+| Fishing | The hook follows the mouse; hook gold fish and click to reel them in, weave round red pufferfish | a pufferfish touches the hook, or time | time to land the catch |
+| Hoops | Slingshot: press on the ball, pull back, let go. The guide dots shorten each level; rim and backboard bounces; the hoop drifts from level 3 | out of shots | time |
+| Putt | Crazy golf, same slingshot. Bumpers, a windmill bar from level 4; too fast and it skips the hole | out of strokes (3) | strokes, then time |
+| Darts | The aim sways; hold to steady it (a held breath), let go to throw. Hold too long and you shake | a dart off the board | total distance from the bull |
+| Maze | Cursor from START to the gold exit through a freshly carved maze; dark from level 6, the cursor a torch | touching a wall | time |
+| Tightrope | Slide the balance pole against the lean to keep a walker up; gusts are signposted a moment before | falling | average lean |
+| Herd | Be the sheepdog: sheep flee the cursor and flock; get them all through the gap into the pen; a pond from level 5 | time | time |
+| Penalty | The keeper follows your aim a beat late and dives when you shoot: pull him one way, shoot the other. Three from five | three goals out of reach | shots, then time |
+| Traffic | Click cars at a crossroads to stop them and wave them on; two roads, then three, then four | a crash, or a car kept waiting (road rage) | total waiting caused |
+| Trail | A path crawls across the grid and hides; draw it back, dragging or clicking | a wrong cell | time |
+| Repaint | A picture of coloured cells shows and is wiped; paint it back from a palette | time | time |
+| What's Missing? | A tray of shapes blinks and comes back one short (shuffled from level 4); pick the missing one of four | a wrong pick | time |
+| Pop the Lock | Click as the needle crosses the gold notch; it turns round after every hit | clicking off the notch, or letting it pass | total distance from the notches' middles |
+| Rhythm | Notes fall down three lanes; hit A, S or D (or click the lane) on the line. Off-beats, then chords | a missed note, or a hit on nothing | total timing error |
+
+How some of them work: the maze is a random depth-first carve (one way through, plenty of dead
+ends), and the whole stroke since the last frame is checked, so a flick can't jump a wall.
+Tightrope is an inverted pendulum stepped at 1/240 s; the walker stays put and the rope
+scrolls. Herd's sheep flee, flock and wander, with fences as segments they slide along.
+Traffic and Fishing draw inside a `RectMask2D`, so things slide in from the edges. Rhythm reads
+keys through the new `KeyInput.LanesPressed()`, a bitmask, so a chord's two keys in one frame
+both count. New in the kit: `UiKit.Line` / `SetLine` (a rotated thin bar), used for walls, the
+rope, fences, the lock's notch and the net. Someone knocked out watches the level played for
+them: the walker balances, the dog herds, the cop waves traffic through, the keeper gets
+feinted, the hoops and putts are taken.
+
+Tightrope is the one ramp that isn't a guess: its first draft was near impossible, so its
+numbers were tuned against a simulated player with a quarter-second reaction (a sloppy one
+clears level 1 about nine times in ten; by level 8 only a steady one does). Every other ramp
+is still a first draft. Also fixed while rendering them: the rule card's controls row counts
+DRAG as mouse, and a game you can play either way (Rhythm, Pop the Lock) says "Mouse or
+keyboard" rather than one or the other.
 
 ## More minigames, fewer questions — 28 Sep 2026
 
