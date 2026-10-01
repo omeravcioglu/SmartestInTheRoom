@@ -74,6 +74,23 @@ namespace Smartest.Minigames
             return img;
         }
 
+        /// <summary>A straight line from a to b: a thin flat bar, rotated. Move it with <see cref="SetLine"/>.</summary>
+        public static RectTransform Line(Transform parent, string name, Vector2 a, Vector2 b, float thickness, Color color)
+        {
+            var rt = (RectTransform)Fill(parent, name, new Vector2(1f, thickness), Vector2.zero, color).transform;
+            SetLine(rt, a, b);
+            return rt;
+        }
+
+        public static void SetLine(RectTransform line, Vector2 a, Vector2 b)
+        {
+            if (line == null) return;
+            var d = b - a;
+            line.anchoredPosition = (a + b) * 0.5f;
+            line.sizeDelta = new Vector2(d.magnitude, line.sizeDelta.y);
+            line.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg);
+        }
+
         /// <summary>A round piece with a 4 px ink ring (3 px on small dots).</summary>
         public static Image Dot(Transform parent, string name, float diameter, Vector2 pos, Color color)
         {

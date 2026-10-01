@@ -323,6 +323,21 @@ namespace Smartest.Core
                 { "statues",      "Statues. Run on green, freeze on red. I'm watching." },
                 { "slice",        "Slice. Slash the gold, leave the bombs. You'll know if you don't." },
                 { "colour_match", "Colour Match. See it, click it. No thinking." },
+                { "juggle",       "Juggle. Two balls, then three. They don't get along." },
+                { "fishing",      "Fishing. Gold fish, lovely. Pufferfish, not lovely." },
+                { "hoops",        "Hoops. Pull back, let fly. Nothing but net, please." },
+                { "putt",         "Putt. Gently. Gently! Mind the windmill." },
+                { "darts",        "Darts. Hold your breath. Not for too long." },
+                { "maze",         "Maze. Don't touch the walls. And later, don't be afraid of the dark." },
+                { "tightrope",    "Tightrope. Keep them up. Whatever you do, don't look down." },
+                { "herd",         "Herd. You're the sheepdog. Sheep are not clever. Be cleverer." },
+                { "penalty",      "Penalty. Send the keeper the wrong way. He's watching your eyes." },
+                { "traffic",      "Traffic. No crashes. No road rage. You're the lights now." },
+                { "trail",        "Trail. Watch the snake. Then be the snake." },
+                { "repaint",      "Repaint. Remember the picture. Paint it back. You're an artist now." },
+                { "whats_missing", "What's Missing? Something walked off. Which one?" },
+                { "pop_lock",     "Pop the Lock. Click on the gold. Don't click on anything else." },
+                { "rhythm",       "Rhythm. Hit it on the line. Feel the beat. Or fake it." },
             };
 
             var list = new List<Entry>();

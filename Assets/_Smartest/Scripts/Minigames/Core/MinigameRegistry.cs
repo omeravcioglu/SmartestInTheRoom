@@ -419,6 +419,113 @@ namespace Smartest.Minigames
                 Rule = "A colour shows in the middle. Click the pad of the same colour, fast. Wrong pad and you're out.",
                 Controls = "CLICK", ViewType = typeof(ColourMatchGame),
                 Order = MetricOrder.LowerIsBetter, LevelSeconds = 18f },
+
+            // ---------------- Skill: flick, aim, steer ----------------
+            new MinigameEntry {
+                Id = "juggle", RoundId = 155, Title = "Juggle",
+                Prompt = "Two balls. Then three.",
+                Rule = "Click a ball to bat it up. They knock into each other. Let one touch the red floor and you're out.",
+                Controls = "CLICK", ViewType = typeof(JuggleGame),
+                Order = MetricOrder.HigherIsBetter, LevelSeconds = 12f },
+
+            new MinigameEntry {
+                Id = "fishing", RoundId = 156, Title = "Fishing",
+                Prompt = "Gold yes. Red no.",
+                Rule = "The hook follows your mouse. Put it on a gold fish and click to reel it in. Touch a red pufferfish and you're out.",
+                Controls = "MOUSE + CLICK", ViewType = typeof(FishingGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 14f },
+
+            new MinigameEntry {
+                Id = "hoops", RoundId = 157, Title = "Hoops",
+                Prompt = "Pull back. Let fly.",
+                Rule = "Press on the ball, pull back and let go to shoot. Sink enough baskets before your shots run out.",
+                Controls = "DRAG", ViewType = typeof(HoopsGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 17f },
+
+            new MinigameEntry {
+                Id = "putt", RoundId = 158, Title = "Putt",
+                Prompt = "Mind the windmill.",
+                Rule = "Press on the ball, pull back and let go. Sink it within the strokes; hit it too hard and it skips the hole.",
+                Controls = "DRAG", ViewType = typeof(PuttGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 17f },
+
+            new MinigameEntry {
+                Id = "darts", RoundId = 159, Title = "Darts",
+                Prompt = "Hold your breath.",
+                Rule = "Your aim sways. Hold the button to steady it, let go to throw, but don't hold too long. Miss the board and you're out.",
+                Controls = "HOLD CLICK", ViewType = typeof(DartsGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 13f },
+
+            new MinigameEntry {
+                Id = "maze", RoundId = 163, Title = "Maze",
+                Prompt = "Don't touch the walls.",
+                Rule = "Take your cursor from START to the gold exit without touching a wall. Later on, the lights go out.",
+                Controls = "MOUSE", ViewType = typeof(MazeGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 17f },
+
+            new MinigameEntry {
+                Id = "tightrope", RoundId = 164, Title = "Tightrope",
+                Prompt = "Don't look down.",
+                Rule = "Slide the pole with the mouse, against the lean, to keep the walker up. Watch for gusts. Fall and you're out.",
+                Controls = "MOUSE", ViewType = typeof(TightropeGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 10f },
+
+            new MinigameEntry {
+                Id = "herd", RoundId = 166, Title = "Herd",
+                Prompt = "You're the sheepdog.",
+                Rule = "Sheep run from your cursor. Steer every one of them through the gap in the fence and into the pen.",
+                Controls = "MOUSE", ViewType = typeof(HerdGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 18f },
+
+            new MinigameEntry {
+                Id = "penalty", RoundId = 168, Title = "Penalty",
+                Prompt = "Send him the wrong way.",
+                Rule = "The keeper follows your aim. Pull him one way, then click to shoot the other. Score three from five.",
+                Controls = "MOUSE + CLICK", ViewType = typeof(PenaltyGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 17f },
+
+            new MinigameEntry {
+                Id = "traffic", RoundId = 169, Title = "Traffic",
+                Prompt = "No crashes. No road rage.",
+                Rule = "Click a car to stop it, click again to wave it on. Don't let two cars meet, or keep one waiting too long.",
+                Controls = "CLICK", ViewType = typeof(TrafficGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 18f },
+
+            // ---------------- Memory and timing, the second batch ----------------
+            new MinigameEntry {
+                Id = "trail", RoundId = 160, Title = "Trail",
+                Prompt = "Follow the snake.",
+                Rule = "Watch the path crawl across the grid, then draw it back in order. One wrong cell and you're out.",
+                Controls = "DRAG / CLICK", ViewType = typeof(TrailGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 15f },
+
+            new MinigameEntry {
+                Id = "repaint", RoundId = 161, Title = "Repaint",
+                Prompt = "Paint it from memory.",
+                Rule = "A picture shows for a moment, then it's wiped. Pick colours from the palette and paint it back exactly.",
+                Controls = "CLICK / DRAG", ViewType = typeof(RepaintGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 20f },
+
+            new MinigameEntry {
+                Id = "whats_missing", RoundId = 162, Title = "What's Missing?",
+                Prompt = "One of them walked off.",
+                Rule = "Remember the tray. It blinks and comes back one short. Click the one that went. Wrong pick and you're out.",
+                Controls = "CLICK", ViewType = typeof(WhatsMissingGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 11f },
+
+            new MinigameEntry {
+                Id = "pop_lock", RoundId = 165, Title = "Pop the Lock",
+                Prompt = "Click on the gold.",
+                Rule = "Click (or SPACE) as the needle crosses the gold notch. Click early, or let it slip past, and you're out.",
+                Controls = "CLICK / SPACE", ViewType = typeof(LockGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 14f },
+
+            new MinigameEntry {
+                Id = "rhythm", RoundId = 167, Title = "Rhythm",
+                Prompt = "Hit it on the line.",
+                Rule = "Press A, S or D (or click the lane) as each note crosses the line. Miss one, or hit nothing, and you're out.",
+                Controls = "A / S / D / CLICK", ViewType = typeof(RhythmGame),
+                Order = MetricOrder.LowerIsBetter, LevelSeconds = 12f },
         };
 
         public static MinigameEntry Get(string id)

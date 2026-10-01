@@ -85,6 +85,27 @@ namespace Smartest.Core
 #endif
         }
 
+        /// <summary>
+        /// Three lanes at once, for chords: bit 0 = A or left arrow, bit 1 = S or down arrow,
+        /// bit 2 = D or right arrow, each set if that key went down this frame.
+        /// </summary>
+        public static int LanesPressed()
+        {
+            int lanes = 0;
+#if ENABLE_INPUT_SYSTEM
+            var kb = Keyboard.current;
+            if (kb == null) return 0;
+            if (kb.aKey.wasPressedThisFrame || kb.leftArrowKey.wasPressedThisFrame) lanes |= 1;
+            if (kb.sKey.wasPressedThisFrame || kb.downArrowKey.wasPressedThisFrame) lanes |= 2;
+            if (kb.dKey.wasPressedThisFrame || kb.rightArrowKey.wasPressedThisFrame) lanes |= 4;
+#else
+            if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) lanes |= 1;
+            if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) lanes |= 2;
+            if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) lanes |= 4;
+#endif
+            return lanes;
+        }
+
         /// <summary>Held WASD / arrows as a direction, not normalised.</summary>
         public static Vector2 MoveAxis()
         {
