@@ -163,10 +163,11 @@ Every standalone build, this one or File ▸ Build, gets a `Licenses/` folder wi
 OFL texts (Archivo, Atkinson Hyperlegible Next and Mono, Liberation Sans), which the font
 licence asks for.
 
-**Release candidate, 1 Oct:** `Build/Release/SmartestInTheRoom-0.1.0-win64/` (119.0 MB, Mono,
-all 69 minigames with the scoreline tabs and the illustrated art, the app icon). It launches
-cleanly; it still hasn't been played across two PCs, which is what it's for. Older candidates are under
-`Build/Release/_superseded/`, and the old dev build is still loose in `Build/`.
+**Release candidate, 2 Oct:** `Build/Release/SmartestInTheRoom-0.1.0-win64/` (119.1 MB, Mono,
+all 69 minigames with the illustrated art, the how-to-play demos and the trimmed menus, the app
+icon). Built after Build Scenes, EditMode 161/161 and PlayMode (smoke, demos, match flow) on the
+real project; it launches cleanly. It still hasn't been played across two PCs, which is what it's
+for. Older candidates are under `Build/Release/_superseded/`, and the old dev build is still loose in `Build/`.
 
 Checked 1 Oct, on the real project: EditMode 159/159; PlayMode MatchFlowTests and
 MinigameSmokeTests (all 69 games, levels 1-12, as player and spectator); the full ScreenshotTour
@@ -198,8 +199,10 @@ Done 29 Sep - 1 Oct:
   candidate above was rebuilt after the art pass too.
 
 Still open before a public release:
-- **Rebuild the release candidate** with the how-to-play demos (below): Build Scenes bakes the
-  new rule card into the Game scene, then Build Windows Release. The 1 Oct candidate predates them.
+- **A way out of a match.** There is no pause or Esc menu in the Game scene: once a match starts,
+  the only way out is closing the game (Back to lobby appears only on the winner screen).
+- **A privacy policy.** Players sign in anonymously to Unity Gaming Services and join through
+  Relay; UGS's terms want the game's privacy policy to say so, and Steam's store page links one.
 - **Two machines.** Play a full match with 3–4 people on the release candidate, over Relay and
   over LAN. Hosting online is proven; a full match between PCs isn't yet.
 - **Company name** (Player settings; still DefaultCompany) and a **version number** for the
@@ -211,6 +214,14 @@ Still open before a public release:
 - **Playtest tuning** of the ramps, and a design pass on anything that isn't fun.
 - **Version control.** The project isn't in git; put it in before release so a build can be
   traced to its code.
+
+Worth adding (found in the 2 Oct check): music (`Audio/Music` is empty: there is none, menus or
+matches); host options in the lobby (match length, which minigames); kicking a player from the
+lobby; display settings (windowed / fullscreen, resolution; Alt+Enter works today); Steam friend
+invites and rich presence (needs Steamworks); a credits screen; the "Made with Unity" splash is
+optional on Unity 6 and could go or match the paper look. Worth removing: the question-round
+system if it isn't coming back, and unused packages (Visual Scripting, AI Navigation, Timeline,
+the Version Control plugin).
 
 ## How-to-play demos — 1 Oct 2026
 
