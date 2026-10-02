@@ -186,6 +186,13 @@ Done 29 Sep - 1 Oct:
   menu item again. The release check warns if there's no icon.
 - **The finished stamp** ("OUT", "DONE — WAITING") moved to the top of the game panel. It used to
   sit on the line where every game says why the level ended for you ("TOO SLOW") and hid it.
+- **Fewer words around the menus.** Gone: the front page's top strip ("1–8 PLAYERS · ONLINE, WI-FI
+  OR SAME PC", "FIRST TO 100 WINS"), "No in-game chat. Talk on Discord." (front page and lobby),
+  the lobby's ONLINE / WI-FI / LOCAL sticker and the line explaining it, "1 OF 8 SEATS TAKEN" (the
+  1/8 counter says it), the host's start hint, the join card's IP / LOCAL hint ("CODE OR IP" is now
+  "JOIN CODE"), and the sound panel's "No music yet" note. Joining by IP or LOCAL still works; the
+  menus just don't advertise it. The build's README.txt still explains it. `12-front-page.png` was
+  re-rendered to match.
 - **Store screenshots** in `Steam/Screenshots/` (12 at 1920 × 1080, 4K masters, alternatives),
   made by the explicit `SteamShots` test after the art pass; see the README there. The release
   candidate above was rebuilt after the art pass too.

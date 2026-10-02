@@ -4,13 +4,20 @@
 
 ---
 
+| | |
+|---|---|
+| ![Simon, level 4: two players knocked out while the table watches](docs/screenshots/01-knockout.png) | ![Penalty: the keeper dives the wrong way](docs/screenshots/03-penalty.png) |
+| ![Herd: the flock runs from the sheepdog towards the pen](docs/screenshots/05-herd.png) | ![The winner screen and final standings](docs/screenshots/11-winner.png) |
+
+More screenshots are in [`docs/screenshots`](docs/screenshots). They are the Steam store set, rendered by the game's own code from a PlayMode test.
+
 ## Gameplay
 
 - **69 elimination minigames**, each with one line of rules: reaction, reflexes, memory, timing, aim, physics and nerve.
   - Everyone plays the *same* seeded level at the same time, and failing knocks you out.
   - Levels 1–2 are warm-ups. From level 3, if nobody fails, the slowest player goes. If everyone fails, the level comes back harder.
   - The last one standing wins. The payout is 1st +20, 2nd +10, 3rd +5 and last −5, all set in `GameConfig`.
-  - A scoreline on the game panel shows how each level is going: pips (3 of 5 caught), a count (7 / 16) or a progress bar.
+  - A scoreline on the game panel shows how each level is going (pips for 3 of 5 caught, a count like 7 / 16, or a progress bar) and what you have left (shots, tries).
 - **20 question rounds** also exist. They are game-theory dilemmas where your payoff depends on what the rest of the room picks.
   - Playtesters didn't enjoy them, so they are switched off (`GameConfig.questionRounds`).
   - Nothing was deleted, so they can be turned back on and dealt between minigames.
@@ -22,18 +29,17 @@
 
 Signals never rely on red against green alone. Games say NOW / GO / STOP in words, number their cards, or use colors that also differ in brightness.
 
-**Status:** playable prototype, with a first Windows release candidate (0.1.0, 29 Sep 2026).
+**Status:** playable prototype, with a first Windows release candidate (0.1.0, rebuilt 1 Oct 2026 with the art pass and an app icon).
 - Playtests shaped it:
   - The first playtest found the questions too wordy and the minigames the most fun. That led to more minigames per match, a full UI rebuild in the Tabloid style, and a review pass that fixed more than 20 bugs.
   - Later playtesters found the questions not fun at all, so matches are now minigames only.
 - 49 minigames have been added since the first playtest: mouse, catching, reflex, physics and memory games, each still one file.
 - What exists:
   - the voiced host, with 150 of 165 lines recorded;
-  - 159 EditMode tests and PlayMode smoke tests;
+  - 161 EditMode tests and PlayMode smoke tests;
   - a one-click release builder that checks the project before it builds.
 - Still open (see [`docs/SMARTEST_STATUS.md`](docs/SMARTEST_STATUS.md)):
-  - A match across two machines hasn't been played yet. Only the solo host loop is tested.
-  - Online play over Relay is untested.
+  - No match has been played across two machines yet. Online hosting itself is verified: a test signs in and opens a real private Relay lobby.
   - Difficulty ramps are first drafts, except Tightrope's, which was tuned against a simulated player.
   - The intros for the 15 newest minigames aren't recorded yet, and there's no music yet.
 
@@ -46,7 +52,9 @@ The whole interface is drawn in a newspaper style:
   - Gold means points gained and blue means points lost.
 - **In-game screen:** a masthead with *the race to 100*, the stage, a caption bubble for the host (captions can be switched off), and a seat rail showing who is playing, done or out.
 - **Winner screen:** a full front page.
-- **Code-drawn art:** every shape is drawn in code and baked into sprites by the editor builder. There is no imported art.
+- **Code-drawn art:** every shape is drawn in code and baked into sprites by the editor builder.
+  - That includes 33 illustrated pieces in the same flat ink-and-paper style: fish and pufferfish, sheep and a sheepdog, a goalkeeper with a face, moles, and oranges that split along your slash.
+  - Apart from a placeholder app icon, there is no imported art.
 - **Layouts:** built on a 1920 × 1080 frame inside an Expand-mode canvas, so 16:10 and ultrawide screens get more paper instead of a cropped page.
 - **Fonts:** Archivo and Atkinson Hyperlegible.
 
@@ -61,11 +69,11 @@ The whole interface is drawn in a newspaper style:
 | Input | Unity **Input System** |
 | UI | uGUI + **TextMesh Pro**, dynamic font assets generated from TTFs (Turkish glyphs included) |
 | Audio | Host voice lines generated with **ElevenLabs** TTS; sound effects synthesized in code |
-| Testing | Unity Test Framework: 159 EditMode tests, plus PlayMode match-flow, minigame smoke and screenshot-tour tests |
+| Testing | Unity Test Framework: 161 EditMode tests; PlayMode match-flow, minigame smoke and screenshot-tour tests; explicit checks that render the store screenshots and open a real online lobby |
 
 ## What I built
 
-All game code lives in **`Assets/_Smartest/`**: 138 C# scripts, about 27k lines.
+All game code lives in **`Assets/_Smartest/`**: 143 C# scripts, about 30k lines.
 
 | System | Key scripts |
 |---|---|
@@ -73,13 +81,13 @@ All game code lives in **`Assets/_Smartest/`**: 138 C# scripts, about 27k lines.
 | Question rounds (switched off): scoring rules as data, round catalog and deck | `Scripts/Rounds/Resolvers.cs`, `RoundCatalog.cs`, `RoundDeck.cs` |
 | Minigame framework: warm-up and elimination rules, payouts, shared seeded levels, one stage for every game, per-level scoreline, drawing kit | `Scripts/Minigames/Core/EliminationLadder.cs`, `PayoutTable.cs`, `LevelRng.cs`, `MinigameRegistry.cs`, `MinigameView.cs`, `MinigameStage.cs`, `Scoreline.cs`, `UiKit.cs`, `KitWatch.cs` |
 | The 69 minigames (one class each) | `Scripts/Minigames/Games/*.cs` |
-| Tabloid UI kit: color and type tokens, code-drawn ink art, stickers, stamps, headlines and effects | `Scripts/Core/Palette.cs`, `Typo.cs`, `FontSet.cs`, `Scripts/UI/Kit/InkSprites.cs`, `Ink.cs`, `HardShadow.cs`, `TextDrop.cs`, `Burst.cs` |
+| Tabloid UI kit: color and type tokens, code-drawn ink art and illustrations, stickers, stamps, headlines and effects | `Scripts/Core/Palette.cs`, `Typo.cs`, `FontSet.cs`, `Scripts/UI/Kit/InkSprites.cs`, `InkArt.cs`, `Ink.cs`, `HardShadow.cs`, `TextDrop.cs`, `Burst.cs` |
 | HUD: masthead, race to 100, seat rail and seat cards, host caption | `Scripts/UI/Hud/*` |
 | Networking and lobby | `Scripts/Net/NetSession.cs`, `PlayerData.cs`, `Scripts/UI/MenuUI.cs`, `LobbyUI.cs`, `LobbySeat.cs` |
 | Game screens (question, reveal, winner, settings) | `Scripts/UI/GameUI.cs`, `RoundPanel.cs`, `RevealPanel.cs`, `WinnerPanel.cs`, `SettingsPanel.cs` |
 | Voiced host and audio direction | `Scripts/Core/VoiceScript.cs`, `VoiceLines.cs`, `AudioDirector.cs`; code-generated SFX in `Sounds.cs` |
 | Editor tooling | `Editor/SceneBuilder.cs`, `ReleaseBuilder.cs`, `VoiceStudioWindow.cs`, `VoiceWiring.cs`, `RetiredFileCleanup.cs` |
-| Tests | EditMode: `ResolverTests`, `MinigameTests`, `DeckTests`, `TabloidTests`, `VoiceScriptTests`. PlayMode: `MatchFlowTests`, `MinigameSmokeTests`, `ScreenshotTour` |
+| Tests | EditMode: `ResolverTests`, `MinigameTests`, `DeckTests`, `TabloidTests`, `VoiceScriptTests`. PlayMode: `MatchFlowTests`, `MinigameSmokeTests`, `ScreenshotTour`, `SteamShots`, `OnlineHostingCheck` |
 
 The editor tooling covers:
 - **`SceneBuilder`:** a one-click (and headless) builder that regenerates both scenes, the prefabs, the ink art, the font assets and all 89 challenge assets from code.
@@ -131,6 +139,7 @@ This is almost entirely original code and code-drawn art. Imported content:
 - [`docs/SMARTEST_STATUS.md`](docs/SMARTEST_STATUS.md): current state, architecture, the playtest changes, release notes and open issues
 - [`docs/SMARTEST_REDESIGN.md`](docs/SMARTEST_REDESIGN.md): design of the rounds and minigames
 - [`docs/SMARTEST_VOICE_SCRIPT.md`](docs/SMARTEST_VOICE_SCRIPT.md): the host's voice script
+- [`docs/screenshots`](docs/screenshots): the Steam store screenshots
 
 `Tools/GenerateHostVoice.ps1` is a helper script for batch-generating host lines. **The ElevenLabs API key is never stored in the project:** it's read from Unity EditorPrefs or an environment variable.
 
