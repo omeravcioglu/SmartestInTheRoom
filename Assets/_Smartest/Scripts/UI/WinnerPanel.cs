@@ -33,11 +33,10 @@ namespace Smartest.UI
         public void ShowWinner(PlayerData winner, IReadOnlyList<PlayerData> players, bool isHost, int rounds,
             string hostQuote)
         {
-            var cfg = GameBootstrap.ConfigOrDefault;
             string name = winner != null ? winner.DisplayName : "Nobody";
             int score = winner != null ? winner.Score.Value : 0;
 
-            if (roundsText != null) roundsText.text = $"{Mathf.Max(1, rounds)} ROUNDS · FIRST PAST {cfg.targetScore}";
+            if (roundsText != null) roundsText.text = $"{Mathf.Max(1, rounds)} ROUNDS · FIRST PAST {MatchSettings.Target}";
             if (nameText != null) nameText.text = name + " wins.";
             if (points != null) points.Show(SeatCard.Score(score), "POINTS");
             if (caption != null) caption.text = $"{name} · {SeatCard.Score(score)} points.";
@@ -74,7 +73,7 @@ namespace Smartest.UI
 
             int top = 1;
             foreach (var p in players) top = Mathf.Max(top, p.Score.Value);
-            top = Mathf.Max(top, GameBootstrap.ConfigOrDefault.targetScore);
+            top = Mathf.Max(top, MatchSettings.Target);
 
             int place = 0, lastScore = int.MinValue;
             for (int k = 0; k < order.Count; k++)

@@ -102,7 +102,7 @@ namespace Smartest.Net
             if (IsOwner)
             {
                 string local = NetSession.Instance != null ? NetSession.Instance.LocalPlayerName : string.Empty;
-                SetNameRpc(new FixedString32Bytes(Sanitize(local)));
+                IntroduceRpc(new FixedString32Bytes(Sanitize(local)), new FixedString64Bytes(NetSession.DeviceId));
             }
 
             RosterChanged?.Invoke();
@@ -134,12 +134,18 @@ namespace Smartest.Net
         private void OnLevelDoneChanged(bool previous, bool current) => RosterChanged?.Invoke();
         private void OnOutAtLevelChanged(int previous, int current) => RosterChanged?.Invoke();
 
+        /// <summary>Host only: this player's install, which the lobby goes by when it kicks someone.</summary>
+        public string ServerDeviceId { get; private set; }
+
         // ---- RPCs (client -> server) ----
 
+        /// <summary>Owner → host, once on arrival: the name to show, and the install it's playing on.</summary>
         [Rpc(SendTo.Server)]
-        private void SetNameRpc(FixedString32Bytes name)
+        private void IntroduceRpc(FixedString32Bytes name, FixedString64Bytes device)
         {
             PlayerName.Value = new FixedString32Bytes(Sanitize(name.ToString()));
+            ServerDeviceId = device.ToString();
+            if (NetSession.Instance != null) NetSession.Instance.ServerCheckReturning(OwnerClientId, ServerDeviceId);
         }
 
         /// <summary>Client → host. The host validates range/phase and ignores changes after lock-in.</summary>

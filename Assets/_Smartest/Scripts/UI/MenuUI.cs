@@ -24,6 +24,8 @@ namespace Smartest.UI
         [SerializeField] private Button hostButton;
         [SerializeField] private Button joinButton;
         [SerializeField] private Button quitButton;
+        [SerializeField] private Button settingsButton;
+        [SerializeField] private SettingsPanel settingsPanel;
         [SerializeField] private TMP_Text mainStatus;
 
         [Header("Join panel")]
@@ -49,6 +51,7 @@ namespace Smartest.UI
             if (hostButton != null) hostButton.onClick.AddListener(OnHostClicked);
             if (joinButton != null) joinButton.onClick.AddListener(OnJoinClicked);
             if (quitButton != null) quitButton.onClick.AddListener(OnQuitClicked);
+            if (settingsButton != null && settingsPanel != null) settingsButton.onClick.AddListener(settingsPanel.Toggle);
 
             if (codeField != null)
             {
@@ -381,6 +384,9 @@ namespace Smartest.UI
             menu.joinButton = BigChoice(c, "JoinButton", "Join", "Got a code? Type it in.", Palette.PaperHi, 348f);
             menu.quitButton = Ink.TextButton(c, "QuitButton", "QUIT", 22f);
             menu.quitButton.GetComponent<RectTransform>().At(40f, 520f, 120f, 44f);
+            menu.settingsButton = Ink.TextButton(c, "SettingsButton", "SETTINGS", 22f);
+            menu.settingsButton.GetComponent<RectTransform>().At(170f, 520f, 200f, 44f);
+            menu.settingsPanel = settings;
 
             var status = Ink.Text(c, "Status", "", TypeRole.Body, 20f, Palette.Ink, TextAlignmentOptions.TopLeft,
                 lineHeight: 1.35f);

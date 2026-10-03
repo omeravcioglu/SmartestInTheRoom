@@ -105,7 +105,7 @@ namespace Smartest.Tests
             var settings = Object.FindAnyObjectByType<SettingsPanel>(FindObjectsInactive.Include);
             settings.Toggle();
             yield return Wait(0.6f);
-            yield return Shot("03-sound");
+            yield return Shot("03-settings");
             settings.Close();
             yield return Wait(0.4f);
 
@@ -114,6 +114,25 @@ namespace Smartest.Tests
             yield return WaitFor(() => lobby.IsShown, 15f, "the lobby");
             yield return Wait(0.8f);
             yield return Shot("04-lobby");
+
+            // The host's minigame list, with a few games out to show both looks. On borrowed
+            // options, and hidden rather than closed: closing would save them on this machine.
+            var picker = Get<MinigamePicker>(lobby, "picker");
+            if (picker != null)
+            {
+                var shown = new HostOptions();
+                foreach (var id in new[] { "dodge", "fishing", "maze", "putt", "stroop", "type_it" })
+                    shown.SetOn(id, false, MinigameRegistry.All);
+                var mine = HostOptions.Replace(shown);
+                if (MatchSettings.Instance != null) MatchSettings.Instance.ServerApply(shown);
+                picker.Open();
+                yield return Wait(0.6f);
+                yield return Shot("05-minigames");
+                picker.HideInstant();
+                HostOptions.Replace(mine);
+                if (MatchSettings.Instance != null) MatchSettings.Instance.ServerApply(HostOptions.Current);
+                yield return Wait(0.2f);
+            }
 
             NetSession.Instance.StartGame();
             yield return WaitFor(() => GameState.Instance != null && GameState.Instance.IsSpawned
@@ -141,6 +160,18 @@ namespace Smartest.Tests
                     case GamePhase.RoundIntro:
                         yield return Wait(0.7f);
                         yield return Once(def != null && def.IsMinigame ? "20-rule-card" : $"10-intro-{kind}");
+                        if (!_taken.Contains("24-match-menu"))
+                        {
+                            var matchMenu = Object.FindAnyObjectByType<MatchMenu>(FindObjectsInactive.Include);
+                            if (matchMenu != null)
+                            {
+                                matchMenu.Open();
+                                yield return Wait(0.6f);
+                                yield return Once("24-match-menu");
+                                matchMenu.Close();
+                                yield return Wait(0.3f);
+                            }
+                        }
                         // Once every kind of answer has been on screen (or the deck has had its
                         // chance), hand ourselves the match.
                         // With question rounds off there are no answers to wait for.

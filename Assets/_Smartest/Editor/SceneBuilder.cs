@@ -58,6 +58,7 @@ namespace Smartest.EditorTools
         private const string FontSetPath = Root + "/Resources/" + Typo.ResourceName + ".asset";
         private const string BootstrapPrefabPath = Root + "/Resources/Bootstrap.prefab";
         private const string GameStatePrefabPath = Root + "/Resources/GameState.prefab";
+        private const string MatchSettingsPrefabPath = Root + "/Resources/MatchSettings.prefab";
         private const string PlayerDataPrefabPath = Root + "/Prefabs/PlayerData.prefab";
         private const string DefaultNetworkPrefabsPath = "Assets/DefaultNetworkPrefabs.asset";
 
@@ -127,7 +128,8 @@ namespace Smartest.EditorTools
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             GameObject playerDataPrefab = BuildPlayerDataPrefab();
             GameObject gameStatePrefab = BuildGameStatePrefab();
-            BuildBootstrapPrefab(config, playerDataPrefab, gameStatePrefab);
+            GameObject matchSettingsPrefab = BuildMatchSettingsPrefab();
+            BuildBootstrapPrefab(config, playerDataPrefab, gameStatePrefab, matchSettingsPrefab);
             AssetDatabase.SaveAssets();
 
             BuildMenuScene(config);
@@ -498,6 +500,18 @@ namespace Smartest.EditorTools
             return prefab;
         }
 
+        private static GameObject BuildMatchSettingsPrefab()
+        {
+            var go = new GameObject("MatchSettings");
+            var netObj = go.AddComponent<NetworkObject>();
+            netObj.DestroyWithScene = false; // the lobby's options outlive every scene load of the session
+            go.AddComponent<MatchSettings>();
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, MatchSettingsPrefabPath);
+            Object.DestroyImmediate(go);
+            RegenerateNetcodeHash(prefab);
+            return prefab;
+        }
+
         /// <summary>
         /// Netcode assigns each network prefab a GlobalObjectIdHash inside NetworkObject.OnValidate,
         /// which Unity only calls for objects edited in the Inspector — never for prefabs saved from
@@ -570,11 +584,13 @@ namespace Smartest.EditorTools
         private static uint Rotl(uint x, int r) => (x << r) | (x >> (32 - r));
         private static uint ReadU32(byte[] b, int i) => (uint)(b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24));
 
-        private static void BuildBootstrapPrefab(GameConfig config, GameObject playerDataPrefab, GameObject gameStatePrefab)
+        private static void BuildBootstrapPrefab(GameConfig config, GameObject playerDataPrefab, GameObject gameStatePrefab,
+            GameObject matchSettingsPrefab)
         {
             // Reload by path: asset imports in between can leave earlier references stale.
             playerDataPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerDataPrefabPath) ?? playerDataPrefab;
             gameStatePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(GameStatePrefabPath) ?? gameStatePrefab;
+            matchSettingsPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(MatchSettingsPrefabPath) ?? matchSettingsPrefab;
             config = AssetDatabase.LoadAssetAtPath<GameConfig>(ConfigPath) ?? config;
 
             var go = new GameObject("Bootstrap");
@@ -595,7 +611,7 @@ namespace Smartest.EditorTools
                 list = ScriptableObject.CreateInstance<NetworkPrefabsList>();
                 AssetDatabase.CreateAsset(list, DefaultNetworkPrefabsPath);
             }
-            foreach (var p in new[] { playerDataPrefab, gameStatePrefab })
+            foreach (var p in new[] { playerDataPrefab, gameStatePrefab, matchSettingsPrefab })
             {
                 if (p != null && !list.Contains(p))
                 {
@@ -665,11 +681,13 @@ namespace Smartest.EditorTools
             var frame = CreateFrame(canvas.transform);
 
             var settings = SettingsPanel.Create(frame, config);
-            var lobby = LobbyUI.Create(frame, config, settings);
+            var picker = MinigamePicker.Create(frame, config);
+            var lobby = LobbyUI.Create(frame, config, settings, picker);
             CountChallenges(out int social, out int minigames);
             MenuUI.Create(frame, config, settings, lobby, social, minigames);
             HostCaption.Create(frame, 48f, 930f, 1060f); // clear of the play card
-            settings.transform.SetAsLastSibling(); // the modal sits above everything
+            picker.transform.SetAsLastSibling(); // the host's list over the lobby,
+            settings.transform.SetAsLastSibling(); // and the settings over everything
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, MenuScenePath);
@@ -702,13 +720,14 @@ namespace Smartest.EditorTools
             // (GameState is a network prefab spawned by the host after everyone loads this scene — see NetSession.)
 
             var settings = SettingsPanel.Create(frame, config);
+            var matchMenu = MatchMenu.Create(frame, config, settings);
 
             // Everything that stays up for the whole match, in one group the winner page can hide.
             var hudRoot = Ink.Node(frame, "Hud");
             hudRoot.Fill();
             var hud = hudRoot.gameObject.AddComponent<CanvasGroup>();
 
-            var masthead = Masthead.Create(hudRoot, config, settings);
+            var masthead = Masthead.Create(hudRoot, config, settings, matchMenu);
 
             // The stage: x 48–1872, y 150–762. The round, the minigame and the reveal take turns.
             var stage = Ink.Node(hudRoot, "Stage");
@@ -721,7 +740,8 @@ namespace Smartest.EditorTools
             var rail = SeatRail.Create(hudRoot, 48f, 856f, masthead.Race);
 
             var winner = WinnerPanel.Create(frame, config, settings);
-            settings.transform.SetAsLastSibling();
+            matchMenu.transform.SetAsLastSibling(); // over the whole match, the winner page too,
+            settings.transform.SetAsLastSibling(); // with the settings it opens over it
 
             var ui = new GameObject("GameController").AddComponent<GameUI>();
             SetPrivate(ui, "hud", hud);

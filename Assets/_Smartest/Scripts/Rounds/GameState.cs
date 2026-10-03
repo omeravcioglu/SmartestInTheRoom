@@ -211,7 +211,11 @@ namespace Smartest.Rounds
             // Only questions that work with this many players (nobody can join mid-match), and
             // none at all while question rounds are switched off: then a match is all minigames.
             var questions = Config.questionRounds ? library.SocialIds(PlayerData.All.Count) : new List<int>();
-            _deck = new ChallengeDeck(questions, library.MinigameIds(),
+            // The minigames the host left on; all of them if that somehow names none.
+            var options = HostOptions.Current;
+            var minigames = library.MinigameIds().FindAll(id => options.IsOn(library.GetById(id)?.minigameId));
+            if (minigames.Count == 0) minigames = library.MinigameIds();
+            _deck = new ChallengeDeck(questions, minigames,
                 id => library.GetById(id)?.inputType, Environment.TickCount,
                 Config.alternateSocialAndMinigame, minigamesPerQuestion: Config.minigamesPerQuestion);
             _current = null;
@@ -713,7 +717,7 @@ namespace Smartest.Rounds
 
         private void ServerEndScoring()
         {
-            int target = Config.targetScore;
+            int target = MatchSettings.Target;
             int top = int.MinValue;
             var leaders = new List<PlayerData>();
             foreach (var p in PlayerData.All)

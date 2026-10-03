@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -12,6 +13,35 @@ namespace Smartest.Core
     /// </summary>
     public static class KeyInput
     {
+        private static readonly HashSet<Object> s_holders = new HashSet<Object>();
+        private static readonly List<Object> s_gone = new List<Object>();
+
+        /// <summary>
+        /// A menu open over the game (settings, the match menu) holds the game's keys and mouse,
+        /// so a click on one of its buttons never lands in a minigame underneath. Escape and the
+        /// pointer's position still get through: the menus need them.
+        /// </summary>
+        public static void Hold(Object holder, bool hold)
+        {
+            if (holder == null) return;
+            if (hold) s_holders.Add(holder);
+            else s_holders.Remove(holder);
+        }
+
+        /// <summary>Some menu is holding the game's input.</summary>
+        public static bool Held
+        {
+            get
+            {
+                if (s_holders.Count == 0) return false;
+                // A holder destroyed without letting go (the scene changed with it open) doesn't count.
+                s_gone.Clear();
+                foreach (var h in s_holders) if (h == null) s_gone.Add(h);
+                foreach (var h in s_gone) s_holders.Remove(h);
+                return s_holders.Count > 0;
+            }
+        }
+
         public static bool EscapePressed()
         {
 #if ENABLE_INPUT_SYSTEM
@@ -24,6 +54,7 @@ namespace Smartest.Core
 
         public static bool EnterPressed()
         {
+            if (Held) return false;
 #if ENABLE_INPUT_SYSTEM
             var kb = Keyboard.current;
             return kb != null && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame);
@@ -34,6 +65,7 @@ namespace Smartest.Core
 
         public static bool SpacePressed()
         {
+            if (Held) return false;
 #if ENABLE_INPUT_SYSTEM
             var kb = Keyboard.current;
             return kb != null && kb.spaceKey.wasPressedThisFrame;
@@ -45,6 +77,7 @@ namespace Smartest.Core
         /// <summary>1..9 on the number row or the numpad. Returns 0 when nothing was pressed.</summary>
         public static int DigitPressed()
         {
+            if (Held) return 0;
 #if ENABLE_INPUT_SYSTEM
             var kb = Keyboard.current;
             if (kb == null) return 0;
@@ -68,6 +101,7 @@ namespace Smartest.Core
         /// <summary>Which of WASD (or the arrow keys) was pressed this frame: 0 none, 1 up, 2 right, 3 down, 4 left.</summary>
         public static int DirectionPressed()
         {
+            if (Held) return 0;
 #if ENABLE_INPUT_SYSTEM
             var kb = Keyboard.current;
             if (kb == null) return 0;
@@ -91,6 +125,7 @@ namespace Smartest.Core
         /// </summary>
         public static int LanesPressed()
         {
+            if (Held) return 0;
             int lanes = 0;
 #if ENABLE_INPUT_SYSTEM
             var kb = Keyboard.current;
@@ -109,6 +144,7 @@ namespace Smartest.Core
         /// <summary>Held WASD / arrows as a direction, not normalised.</summary>
         public static Vector2 MoveAxis()
         {
+            if (Held) return Vector2.zero;
             float x = 0f, y = 0f;
 #if ENABLE_INPUT_SYSTEM
             var kb = Keyboard.current;
@@ -140,6 +176,7 @@ namespace Smartest.Core
 
         public static bool MousePressed()
         {
+            if (Held) return false;
 #if ENABLE_INPUT_SYSTEM
             var m = Mouse.current;
             return m != null && m.leftButton.wasPressedThisFrame;
@@ -151,6 +188,7 @@ namespace Smartest.Core
         /// <summary>The left button is down right now (not just pressed this frame).</summary>
         public static bool MouseHeld()
         {
+            if (Held) return false;
 #if ENABLE_INPUT_SYSTEM
             var m = Mouse.current;
             return m != null && m.leftButton.isPressed;

@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Smartest.Core;
+using Smartest.Minigames;
 using Smartest.Net;
+using Smartest.Rounds;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,10 +12,11 @@ using UnityEngine.UI;
 namespace Smartest.UI
 {
     /// <summary>
-    /// The lobby: the join code big enough to read out to friends, and the seats — taken ones
-    /// carry a token and a name, open ones wait with a dashed outline. The host starts;
-    /// everyone can leave. A pure view over
-    /// <see cref="PlayerData.All"/> and <see cref="NetSession"/>; MenuUI decides when it's shown.
+    /// The lobby: the join code big enough to read out to friends, the match the host has set
+    /// up (how long, how many minigames), and the seats — taken ones carry a token and a name,
+    /// open ones wait with a dashed outline. The host starts, sets the match up and can kick;
+    /// everyone can leave. A view over <see cref="PlayerData.All"/>, <see cref="MatchSettings"/>
+    /// and <see cref="NetSession"/>; MenuUI decides when it's shown.
     /// </summary>
     public class LobbyUI : Panel
     {
@@ -25,6 +28,13 @@ namespace Smartest.UI
         [SerializeField] private TMP_Text hintText;
         [SerializeField] private Button startButton;
         [SerializeField] private Button leaveButton;
+
+        [Header("The match")]
+        [SerializeField] private RectTransform optionsRoot;
+        [SerializeField] private Button[] lengthButtons = new Button[0];
+        [SerializeField] private TMP_Text gamesText;
+        [SerializeField] private Button chooseButton;
+        [SerializeField] private MinigamePicker picker;
 
         public event Action StartRequested;
         public event Action LeaveRequested;
@@ -48,16 +58,73 @@ namespace Smartest.UI
             }
             if (startButton != null) startButton.onClick.AddListener(() => StartRequested?.Invoke());
             if (leaveButton != null) leaveButton.onClick.AddListener(() => LeaveRequested?.Invoke());
+            for (int i = 0; i < lengthButtons.Length; i++)
+            {
+                int length = i;
+                if (lengthButtons[i] != null) lengthButtons[i].onClick.AddListener(() => OnLength(length));
+            }
+            if (chooseButton != null) chooseButton.onClick.AddListener(OnChoose);
+            foreach (var seat in seats)
+                if (seat != null) seat.KickConfirmed += OnKick;
         }
 
         private void OnEnable()
         {
             PlayerData.RosterChanged += Refresh;
+            MatchSettings.Changed += Refresh;
         }
 
         private void OnDisable()
         {
             PlayerData.RosterChanged -= Refresh;
+            MatchSettings.Changed -= Refresh;
+        }
+
+        // ---- The match: the host's options ----
+
+        private void OnLength(int index)
+        {
+            var net = NetSession.Instance;
+            if (net == null || !net.IsHost) return;
+            var options = HostOptions.Current;
+            options.SetLength(index);
+            options.Save();
+            if (MatchSettings.Instance != null) MatchSettings.Instance.ServerApply(options);
+            Sounds.Play(Sounds.Kind.Click);
+        }
+
+        private void OnChoose()
+        {
+            var net = NetSession.Instance;
+            if (net == null || !net.IsHost || picker == null) return;
+            picker.Open();
+        }
+
+        private void OnKick(ulong clientId)
+        {
+            var net = NetSession.Instance;
+            if (net == null || !net.IsHost) return;
+            net.Kick(clientId);
+            Sounds.Play(Sounds.Kind.Click);
+        }
+
+        /// <summary>What the host set, for everyone; only the host can change it.</summary>
+        private void RefreshOptions(bool isHost)
+        {
+            var settings = MatchSettings.Instance;
+            bool known = settings != null && settings.IsSpawned;
+            if (optionsRoot != null) optionsRoot.gameObject.SetActive(known);
+            if (!known) return;
+            int length = settings.LengthIndex.Value;
+            for (int i = 0; i < lengthButtons.Length; i++)
+            {
+                var button = lengthButtons[i];
+                if (button == null) continue;
+                button.interactable = isHost;
+                if (button.targetGraphic is Image face) face.color = i == length ? Palette.Gold : Palette.PaperHi;
+            }
+            if (gamesText != null) gamesText.text = $"{settings.GamesOn.Value} OF {MinigameRegistry.All.Count}";
+            if (chooseButton != null) chooseButton.gameObject.SetActive(isHost);
         }
 
         protected override void OnShown()
@@ -93,6 +160,7 @@ namespace Smartest.UI
 
             if (codeText != null) codeText.text = string.IsNullOrEmpty(code) ? "------" : code;
             if (countText != null) countText.text = $"{count} / {max}";
+            RefreshOptions(isHost);
 
             // Track arrivals for the "just joined" note.
             var present = new HashSet<ulong>();
@@ -119,7 +187,10 @@ namespace Smartest.UI
                     var p = players[i];
                     string tag = p.IsHostPlayer && p.IsOwner ? "HOST · YOU" : p.IsHostPlayer ? "HOST" : p.IsOwner ? "YOU" : string.Empty;
                     bool fresh = _joinedAt.TryGetValue(p.OwnerClientId, out float at) && Time.unscaledTime - at < JustJoinedSeconds;
-                    seat.SetTaken(i + 1, p.DisplayName, monos[i], tag, p.IsOwner, fresh ? "just joined" : string.Empty);
+                    // The host can send anyone else away, but not once a match is starting.
+                    bool kickable = isHost && !p.IsOwner && !(net != null && net.GameStarted);
+                    seat.SetTaken(i + 1, p.OwnerClientId, p.DisplayName, monos[i], tag, p.IsOwner,
+                        fresh ? "just joined" : string.Empty, kickable);
                 }
                 else seat.SetOpen(i + 1);
             }
@@ -182,7 +253,7 @@ namespace Smartest.UI
         // Construction (SceneBuilder)
         // ------------------------------------------------------------------
 
-        public static LobbyUI Create(Transform frame, GameConfig config, SettingsPanel settings)
+        public static LobbyUI Create(Transform frame, GameConfig config, SettingsPanel settings, MinigamePicker picker)
         {
             var root = Ink.Node(frame, "LobbyPanel");
             root.Fill();
@@ -213,6 +284,34 @@ namespace Smartest.UI
             var copy = Ink.Slab(root, "Copy", "Copy", Palette.PaperHi, Palette.Ink, 56f, 4f, 8f);
             copy.GetComponent<RectTransform>().At(48f, 424f, 220f, 84f);
             lobby.copyButton = copy;
+
+            // The match: how long, and which games. The host sets it up; everyone sees it.
+            var options = Ink.Node(root, "Match");
+            options.At(48f, 552f, 680f, 260f);
+            lobby.optionsRoot = options;
+            Ink.Label(options, "LengthLabel", "MATCH LENGTH", 15f).rectTransform.At(0f, 0f, 400f, 20f);
+            var lengths = HostOptions.Lengths;
+            lobby.lengthButtons = new Button[lengths.Length];
+            for (int i = 0; i < lengths.Length; i++)
+            {
+                var choice = Ink.Slab(options, "Length" + i, lengths[i].Name, Palette.PaperHi, Palette.Ink, 34f, 3f, 6f);
+                choice.GetComponent<RectTransform>().At(i * 234f, 32f, 212f, 88f);
+                // A guest can't change it, but has to read it: no fading the host's choice.
+                choice.GetComponent<SlabPress>().DimWhenDisabled = false;
+                var word = choice.transform.Find("Label").GetComponent<TMP_Text>();
+                word.rectTransform.Fill(10f, 10f, 10f, 36f);
+                var target = Ink.Label(choice.transform, "Target", $"FIRST TO {lengths[i].Target}", 12f,
+                    Palette.Ink, TextAlignmentOptions.Center);
+                target.rectTransform.Fill(10f, 54f, 10f, 12f);
+                lobby.lengthButtons[i] = choice;
+            }
+            Ink.Label(options, "GamesLabel", "MINIGAMES", 15f).rectTransform.At(0f, 152f, 400f, 20f);
+            lobby.gamesText = Ink.Text(options, "Games", "69 OF 69", TypeRole.Display, 48f, Palette.Ink,
+                TextAlignmentOptions.MidlineLeft, lineHeight: 1f).OneLine();
+            lobby.gamesText.rectTransform.At(0f, 180f, 420f, 72f);
+            lobby.chooseButton = Ink.Slab(options, "Choose", "Choose", Palette.PaperHi, Palette.Ink, 36f, 3f, 6f);
+            lobby.chooseButton.GetComponent<RectTransform>().At(468f, 184f, 212f, 68f);
+            lobby.picker = picker;
 
             // Seats.
             Ink.Label(root, "PlayersLabel", "THE PLAYERS", 15f).rectTransform.At(800f, 176f, 400f, 20f);

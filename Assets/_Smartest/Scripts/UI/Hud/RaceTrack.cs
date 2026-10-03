@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using Smartest.Core;
+using Smartest.Net;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -20,6 +21,8 @@ namespace Smartest.UI
         [SerializeField] private RectTransform barsRoot;
         [SerializeField] private Image star;
         [SerializeField] private TMP_Text toGo;
+        [SerializeField] private TMP_Text label;
+        [SerializeField] private TMP_Text endMark;
         [Tooltip("x of score 0 inside the track.")]
         [SerializeField] private float originX = 20f;
         [Tooltip("Length of the ruler from 0 to the target score.")]
@@ -44,9 +47,20 @@ namespace Smartest.UI
 
         private readonly Dictionary<ulong, Tag> _tags = new Dictionary<ulong, Tag>();
         private readonly List<Image> _bars = new List<Image>();
+        private int _shownTarget;
 
-        private static int Target => Mathf.Max(1, GameBootstrap.ConfigOrDefault.targetScore);
+        // The lobby's choice (50, 100, 150); the scene is built with the config's.
+        private static int Target => MatchSettings.Target;
         private float PxPerPoint => rulerLength / Target;
+
+        private void ShowTarget()
+        {
+            int target = Target;
+            if (target == _shownTarget) return;
+            _shownTarget = target;
+            if (label != null) label.text = $"THE RACE TO {target}";
+            if (endMark != null) endMark.text = target.ToString();
+        }
 
         public float CentreOf(int score) => originX + Mathf.Clamp(score, 0, Target) * PxPerPoint;
 
@@ -63,6 +77,7 @@ namespace Smartest.UI
         public void Refresh(IReadOnlyList<Entry> entries, float animate)
         {
             if (tagsRoot == null) return;
+            ShowTarget();
 
             // Drop tags for players who left.
             var alive = new HashSet<ulong>();
@@ -182,7 +197,8 @@ namespace Smartest.UI
             root.At(left, top, 1080f, 110f);
             var race = root.gameObject.AddComponent<RaceTrack>();
 
-            Ink.Label(root, "Label", $"THE RACE TO {target}", 11f).rectTransform.At(0f, 6f, 400f, 14f);
+            race.label = Ink.Label(root, "Label", $"THE RACE TO {target}", 11f);
+            race.label.rectTransform.At(0f, 6f, 400f, 14f);
             Ink.Plain(root, "Ruler", Palette.Ink).rectTransform.At(20f, 68f, 1000f, 3f);
             for (int i = 0; i <= 10; i++)
             {
@@ -193,6 +209,7 @@ namespace Smartest.UI
                     var n = Ink.Text(root, "Mark" + i, i == 0 ? "0" : target.ToString(), TypeRole.Sticker, 10f,
                         Palette.Ink, TextAlignmentOptions.Top).OneLine();
                     n.rectTransform.At(20f + i * 100f - 15f, 86f, 30f, 14f);
+                    if (i == 10) race.endMark = n;
                 }
             }
             var flag = Ink.Icon(root, "Finish", InkSprites.Checker, Color.white);

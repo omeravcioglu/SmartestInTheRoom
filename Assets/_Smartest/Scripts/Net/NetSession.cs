@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Smartest.Core;
+using Unity.Collections;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using Unity.Services.Authentication;
@@ -33,6 +35,10 @@ namespace Smartest.Net
         public const string MenuSceneName = "Menu";
         public const string GameSceneName = "Game";
         private const string NamePrefKey = "smartest.player_name";
+        private const string DeviceIdPrefKey = "smartest.device_id";
+
+        /// <summary>What a kicked player is told, on the front page.</summary>
+        public const string KickedMessage = "The host removed you from the lobby.";
 
         public enum Mode { None, Relay, Local, Lan }
 
@@ -55,6 +61,8 @@ namespace Smartest.Net
         private bool _leaving;
         private bool _wasConnected;
         private string _lastDisconnectReason;
+        // Host: the installs this lobby has kicked; they can't come back until it closes.
+        private readonly HashSet<string> _kicked = new HashSet<string>();
 
         public NetworkManager Nm => _nm != null ? _nm : (_nm = GetComponent<NetworkManager>());
         public bool IsInSession => Nm != null && Nm.IsListening;
@@ -69,6 +77,22 @@ namespace Smartest.Net
             {
                 PlayerPrefs.SetString(NamePrefKey, PlayerData.Sanitize(value));
                 PlayerPrefs.Save();
+            }
+        }
+
+        /// <summary>A random id for this install, made once: how a lobby knows someone it kicked.</summary>
+        public static string DeviceId
+        {
+            get
+            {
+                string id = PlayerPrefs.GetString(DeviceIdPrefKey, string.Empty);
+                if (string.IsNullOrEmpty(id))
+                {
+                    id = Guid.NewGuid().ToString("N");
+                    PlayerPrefs.SetString(DeviceIdPrefKey, id);
+                    PlayerPrefs.Save();
+                }
+                return id;
             }
         }
 
@@ -163,6 +187,7 @@ namespace Smartest.Net
                     await LeaveAsync();
                     return false;
                 }
+                EnsureMatchSettingsSpawned();
                 Report("Lobby ready.");
                 return true;
             }
@@ -264,6 +289,7 @@ namespace Smartest.Net
             }
             JoinCode = lan ? advertised : LocalCode;
             CurrentMode = lan ? Mode.Lan : Mode.Local;
+            EnsureMatchSettingsSpawned();
             Report(lan ? $"Wi-Fi lobby ready on {advertised}." : "Local lobby ready (same PC only).");
             return true;
         }
@@ -451,6 +477,70 @@ namespace Smartest.Net
                 Debug.LogError($"[NetSession] Could not load Menu scene: {status}");
         }
 
+        /// <summary>Host, mid-match: stop it and take everyone back to the lobby, which tells them why.</summary>
+        public void EndMatchForEveryone()
+        {
+            if (!IsHost || !GameStarted) return;
+            if (MatchSettings.Instance != null && MatchSettings.Instance.IsSpawned)
+                MatchSettings.Instance.TellEveryoneRpc(new FixedString128Bytes("The host ended the match."));
+            ReturnToLobby();
+        }
+
+        /// <summary>
+        /// Host only, idempotent: spawns the lobby's MatchSettings (Resources/MatchSettings) if it
+        /// isn't up. It stays for the whole session, through every match.
+        /// </summary>
+        public void EnsureMatchSettingsSpawned()
+        {
+            // Not on the way out: despawning the old one fires events, and spawning a new one
+            // from inside the shutdown would leave it behind, claiming to belong to the next lobby.
+            if (Nm == null || !Nm.IsServer || !Nm.IsListening || Nm.ShutdownInProgress || _leaving) return;
+            var existing = MatchSettings.Instance;
+            if (existing != null)
+            {
+                if (existing.IsSpawned && Nm.SpawnManager.SpawnedObjects.TryGetValue(existing.NetworkObjectId, out var live)
+                    && live == existing.NetworkObject) return;
+                Destroy(existing.gameObject); // left over from a session that's gone
+            }
+
+            var prefab = Resources.Load<GameObject>(MatchSettings.PrefabResourceName);
+            if (prefab == null)
+            {
+                Debug.LogError("[NetSession] Resources/MatchSettings.prefab is missing. Run Tools > Smartest > Build Scenes.");
+                return;
+            }
+            var go = Instantiate(prefab);
+            go.name = "MatchSettings";
+            var netObj = go.GetComponent<NetworkObject>();
+            if (netObj == null)
+            {
+                Debug.LogError("[NetSession] MatchSettings prefab has no NetworkObject.");
+                Destroy(go);
+                return;
+            }
+            netObj.Spawn(destroyWithScene: false);
+        }
+
+        /// <summary>
+        /// Host, in the lobby: send a player away. They're told why, and this lobby won't take
+        /// them back (it knows them by <see cref="DeviceId"/>) until the host opens a new one.
+        /// </summary>
+        public void Kick(ulong clientId)
+        {
+            if (!IsHost || GameStarted || clientId == NetworkManager.ServerClientId) return;
+            var player = PlayerData.Get(clientId);
+            if (player != null && !string.IsNullOrEmpty(player.ServerDeviceId)) _kicked.Add(player.ServerDeviceId);
+            Nm.DisconnectClient(clientId, KickedMessage);
+        }
+
+        /// <summary>Host: a player has just said who they are. One this lobby kicked goes straight back out.</summary>
+        public void ServerCheckReturning(ulong clientId, string deviceId)
+        {
+            if (!IsHost || clientId == NetworkManager.ServerClientId) return;
+            if (string.IsNullOrEmpty(deviceId) || !_kicked.Contains(deviceId)) return;
+            Nm.DisconnectClient(clientId, KickedMessage);
+        }
+
         private async Task SetSessionLockedAsync(bool locked)
         {
             if (_session == null || !_session.IsHost) return;
@@ -548,6 +638,7 @@ namespace Smartest.Net
             _wasConnected = false;
             _lastDisconnectReason = null;
             GameStarted = false;
+            _kicked.Clear(); // a new lobby starts with nobody turned away
         }
 
         private void CleanupLocalState()

@@ -1,3 +1,4 @@
+using System;
 using Smartest.Core;
 using TMPro;
 using UnityEngine;
@@ -7,7 +8,8 @@ namespace Smartest.UI
 {
     /// <summary>
     /// One seat in the lobby grid. Taken: token, name, tag, a paper card with a hard shadow
-    /// (gold if it's you). Open: a dashed outline that says "waiting…".
+    /// (gold if it's you). Open: a dashed outline that says "waiting…". The host also gets a
+    /// small ✕ on everyone else's seat: one click turns it into KICK?, a second sends them away.
     /// </summary>
     public class LobbySeat : MonoBehaviour
     {
@@ -21,9 +23,34 @@ namespace Smartest.UI
         [SerializeField] private TMP_Text tagText;
         [SerializeField] private TMP_Text seatText;
         [SerializeField] private TMP_Text noteText;
+        [SerializeField] private Button kickButton;
+        [SerializeField] private Image kickIcon;
+        [SerializeField] private TMP_Text kickText;
 
-        public void SetTaken(int seat, string playerName, string monogram, string tag, bool you, string note)
+        private const float KickSize = 34f;
+        private const float AskSeconds = 3f;
+
+        /// <summary>The host clicked KICK? on this seat: the player sitting in it.</summary>
+        public event Action<ulong> KickConfirmed;
+
+        private ulong _clientId;
+        private float _askingUntil;
+
+        private void Awake()
         {
+            if (kickButton != null) kickButton.onClick.AddListener(OnKick);
+        }
+
+        private void Update()
+        {
+            if (_askingUntil > 0f && Time.unscaledTime > _askingUntil) StopAsking();
+        }
+
+        public void SetTaken(int seat, ulong clientId, string playerName, string monogram, string tag, bool you,
+            string note, bool kickable)
+        {
+            if (clientId != _clientId) StopAsking(); // someone else sits here now: don't kick them by mistake
+            _clientId = clientId;
             card.enabled = true;
             card.color = you ? Palette.Gold : Palette.PaperHi;
             dashed.enabled = false;
@@ -37,6 +64,7 @@ namespace Smartest.UI
             tagText.text = tag ?? string.Empty;
             seatText.text = "SEAT " + seat;
             noteText.text = note ?? string.Empty;
+            SetKickable(kickable);
         }
 
         public void SetOpen(int seat)
@@ -52,6 +80,44 @@ namespace Smartest.UI
             tagText.text = string.Empty;
             seatText.text = "SEAT " + seat;
             noteText.text = "waiting…";
+            SetKickable(false);
+        }
+
+        private void SetKickable(bool on)
+        {
+            if (kickButton == null || kickButton.gameObject.activeSelf == on) return;
+            kickButton.gameObject.SetActive(on);
+            StopAsking();
+        }
+
+        private void OnKick()
+        {
+            if (_askingUntil <= 0f)
+            {
+                _askingUntil = Time.unscaledTime + AskSeconds;
+                ShowAsking(true);
+                Sounds.Play(Sounds.Kind.Click);
+                return;
+            }
+            StopAsking();
+            KickConfirmed?.Invoke(_clientId);
+        }
+
+        private void StopAsking()
+        {
+            _askingUntil = 0f;
+            ShowAsking(false);
+        }
+
+        /// <summary>The ✕ in its corner, or a red KICK? grown out of it to the left.</summary>
+        private void ShowAsking(bool asking)
+        {
+            if (kickButton == null) return;
+            var box = (RectTransform)kickButton.transform;
+            box.sizeDelta = new Vector2(asking ? 104f : KickSize, KickSize);
+            if (kickButton.targetGraphic is Image face) face.color = asking ? Palette.Red : Palette.PaperHi;
+            if (kickIcon != null) kickIcon.enabled = !asking;
+            if (kickText != null) kickText.enabled = asking;
         }
 
         public static LobbySeat Create(Transform parent, string name, float left, float top, float width, float height)
@@ -86,6 +152,26 @@ namespace Smartest.UI
             seat.noteText = Ink.Text(root, "Note", "", TypeRole.Body, 18f, Palette.Ink2, TextAlignmentOptions.BottomRight).OneLine();
             seat.noteText.fontStyle |= FontStyles.Italic;
             seat.noteText.rectTransform.At(width - 18f - 150f, height - 16f - 26f, 150f, 26f);
+
+            // The kick: a paper square on the card's top-right corner, half off it, so it never
+            // crowds the name. Asking, it grows leftwards into a red KICK?.
+            var kick = Ink.Box(root, "Kick", Palette.PaperHi, 3f, 0f, raycast: true);
+            var rt = kick.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(1f, 1f);
+            rt.anchoredPosition = new Vector2(KickSize * 0.4f, KickSize * 0.4f);
+            rt.sizeDelta = new Vector2(KickSize, KickSize);
+            Ink.Shadow(kick, 3f);
+            seat.kickButton = kick.gameObject.AddComponent<Button>();
+            seat.kickButton.transition = Selectable.Transition.None;
+            seat.kickButton.targetGraphic = kick;
+            seat.kickIcon = Ink.Icon(kick.transform, "Cross", InkSprites.Cross, Palette.Ink);
+            seat.kickIcon.rectTransform.Fill(9f, 9f, 9f, 9f);
+            seat.kickText = Ink.Text(kick.transform, "Ask", "KICK?", TypeRole.Sticker, 18f, Palette.OnRed,
+                TextAlignmentOptions.Center, caps: true, tracking: 0.06f).OneLine();
+            seat.kickText.rectTransform.Fill(6f, 2f, 6f, 2f);
+            seat.kickText.enabled = false;
+            kick.gameObject.SetActive(false);
             return seat;
         }
     }

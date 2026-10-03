@@ -246,7 +246,7 @@ namespace Smartest.UI
                 return;
             }
 
-            bool tiedAtTop = gs != null && gs.TieBreak.Value && atTop > 1 && p.Score.Value == top && top >= cfg.targetScore;
+            bool tiedAtTop = gs != null && gs.TieBreak.Value && atTop > 1 && p.Score.Value == top && top >= MatchSettings.Target;
             switch (phase)
             {
                 case GamePhase.RoundIntro:

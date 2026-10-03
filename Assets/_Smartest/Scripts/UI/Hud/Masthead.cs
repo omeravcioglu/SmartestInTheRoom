@@ -7,7 +7,7 @@ namespace Smartest.UI
 {
     /// <summary>
     /// The top of every in-game screen: the round number and what kind of round it is on the
-    /// left, the race to 100 in the middle, the sound button on the right.
+    /// left, the race to 100 in the middle, the menu and sound buttons on the right.
     /// </summary>
     [AddComponentMenu("Smartest/Masthead")]
     public class Masthead : MonoBehaviour
@@ -22,7 +22,7 @@ namespace Smartest.UI
         /// Round block left, the race to 100 in the middle, sound right, and the double rule
         /// (6 px, then 2 px) that closes off the masthead like a newspaper's.
         /// </summary>
-        public static Masthead Create(Transform frame, GameConfig config, SettingsPanel settings)
+        public static Masthead Create(Transform frame, GameConfig config, SettingsPanel settings, MatchMenu menu)
         {
             var root = Ink.Node(frame, "Masthead");
             root.At(0f, 0f, 1920f, 150f);
@@ -36,6 +36,7 @@ namespace Smartest.UI
             Ink.BoxOf(m.kindText).Pin(40f, 87f, new Vector2(0f, 1f));
 
             m.race = RaceTrack.Create(root, 420f, 10f, config);
+            MenuButton.Create(root, menu, 1872f - 56f - 16f - 56f, 37f, 56f);
             SoundButton.Create(root, settings, 1872f - 56f, 37f, 56f);
             Ink.Plain(root, "Rule1", Palette.Ink).rectTransform.At(48f, 124f, 1824f, 6f);
             Ink.Plain(root, "Rule2", Palette.Ink).rectTransform.At(48f, 134f, 1824f, 2f);

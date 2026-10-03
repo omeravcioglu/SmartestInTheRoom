@@ -514,7 +514,7 @@ namespace Smartest.UI
                 }
             }
 
-            int target = Config.targetScore;
+            int target = MatchSettings.Target;
             int top = int.MinValue, bottom = int.MaxValue, secondLowest = int.MaxValue;
             foreach (var p in players)
             {

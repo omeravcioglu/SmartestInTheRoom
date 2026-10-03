@@ -199,8 +199,8 @@ Done 29 Sep - 1 Oct:
   candidate above was rebuilt after the art pass too.
 
 Still open before a public release:
-- **A way out of a match.** There is no pause or Esc menu in the Game scene: once a match starts,
-  the only way out is closing the game (Back to lobby appears only on the winner screen).
+- **Rebuild the release candidate**: the 2 Oct one predates the lobby options, kick, match menu
+  and screen settings (below).
 - **A privacy policy.** Players sign in anonymously to Unity Gaming Services and join through
   Relay; UGS's terms want the game's privacy policy to say so, and Steam's store page links one.
 - **Two machines.** Play a full match with 3–4 people on the release candidate, over Relay and
@@ -209,19 +209,50 @@ Still open before a public release:
   release (0.1.0 now).
 - **ElevenLabs licence.** A paid ElevenLabs plan is what allows commercial use of the voice.
   Check the plan the clips were made on before selling the game. 15 intros are unrecorded.
-- **Store art.** Screenshots and an icon exist; Steam also needs the capsule images (header
-  920 × 430, small 462 × 174, main 1232 × 706, vertical 748 × 896) and the library images.
+- **Store art.** Screenshots, an icon and a 62-second trailer (`Steam/Trailer/`, made from the
+  game's own screens by the explicit `TrailerCapture` test and `Tools/Trailer/build_trailer.py`,
+  with original synthesised music; see its README) exist. Steam also needs the capsule images
+  (header 920 × 430, small 462 × 174, main 1232 × 706, vertical 748 × 896) and the library images.
 - **Playtest tuning** of the ramps, and a design pass on anything that isn't fun.
 - **Version control.** The project isn't in git; put it in before release so a build can be
   traced to its code.
 
 Worth adding (found in the 2 Oct check): music (`Audio/Music` is empty: there is none, menus or
-matches); host options in the lobby (match length, which minigames); kicking a player from the
-lobby; display settings (windowed / fullscreen, resolution; Alt+Enter works today); Steam friend
-invites and rich presence (needs Steamworks); a credits screen; the "Made with Unity" splash is
-optional on Unity 6 and could go or match the paper look. Worth removing: the question-round
-system if it isn't coming back, and unused packages (Visual Scripting, AI Navigation, Timeline,
-the Version Control plugin).
+matches); Steam friend invites and rich presence (needs Steamworks); a credits screen; the "Made
+with Unity" splash is optional on Unity 6 and could go or match the paper look. Worth removing:
+the question-round system if it isn't coming back, and unused packages (Visual Scripting, AI
+Navigation, Timeline, the Version Control plugin).
+
+## Lobby options, kick, match menu, screen settings — 2 Oct 2026
+
+- **Host options.** The lobby's left column shows MATCH LENGTH (Short, first to 50; Standard,
+  100; Long, 150) and MINIGAMES (how many of the 69 are in the deck), with CHOOSE opening the
+  minigame list (`MinigamePicker`: a ticket per game, gold when in, struck through when out; at
+  least 3 stay in). Only the host can change them; guests see them. `HostOptions` holds the
+  choice and saves it on the host's machine (PlayerPrefs `smartest.host_options`: the games
+  switched off, so new games start in). `MatchSettings`, a network object the host spawns with
+  the lobby (Resources/MatchSettings, kept for the whole session), shows it to everyone; the
+  match plays to `MatchSettings.Target` (the race track, seat rail, scoring and winner page read
+  it) and GameState deals only the games left on.
+- **Kick.** The host gets a small ✕ on every other seat in the lobby; one click turns it into a
+  red KICK?, a second sends the player away with "The host removed you from the lobby." on their
+  front page. The lobby remembers their install (`NetSession.DeviceId`, sent with the name on
+  arrival) and turns them away if they come back, until the host opens a new lobby. Lobby only.
+- **Match menu.** Esc, or the ☰ beside the sound button, opens it mid-match: RESUME, SETTINGS,
+  and the way out. A guest's LEAVE MATCH goes to the front page while the others play on; the
+  host's END MATCH takes everyone back to the lobby ("The host ended the match.") and LEAVE closes
+  the lobby. The ways out ask twice. The match keeps running underneath.
+- **Menus hold the game's input.** While the match menu or the settings are open, `KeyInput`
+  reports no game keys or clicks (`KeyInput.Hold`), so a click on a menu button never lands in a
+  minigame underneath. Clicks on the old sound panel used to.
+- **Screen settings.** Settings is two columns now: sound on the left; on the right FULL SCREEN
+  (always the monitor's own resolution) or WINDOW with a size from the 16:9 ones that fit, and
+  host captions. Unity remembers the screen mode itself. The front page has a SETTINGS link next
+  to QUIT.
+- Tests: `HostOptionsTests` (EditMode: lengths, the minimum, saving, junk saves, window sizes);
+  `MatchFlowTests` gained the options shaping a match, no kick on your own seat, the picker, END
+  MATCH and LEAVE from the menu. Kicking needs a second player, so it's down for the two-machine
+  playtest.
 
 ## How-to-play demos — 1 Oct 2026
 
