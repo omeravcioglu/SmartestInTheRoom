@@ -1,6 +1,6 @@
 # Smartest in the Room
 
-**An online party game for 1–8 players made in Unity 6.** A match is a run of fast elimination minigames until someone reaches 100 points. Everyone plays the same level at the same time. There are 69 games, from reflex tests to crazy golf, a sheepdog to steer and a maze carved fresh every level. A voiced host runs the show, and the whole game wears a hand-built "Tabloid" newspaper look.
+**An online party game for 1–8 players made in Unity 6.** A match is a run of fast elimination minigames until someone reaches the target score (50, 100 or 150; the host chooses). Everyone plays the same level at the same time. There are 69 games, from reflex tests to crazy golf, a sheepdog to steer and a maze carved fresh every level. A voiced host runs the show, and the whole game wears a hand-built "Tabloid" newspaper look.
 
 ---
 
@@ -18,6 +18,12 @@ More screenshots are in [`docs/screenshots`](docs/screenshots). They are the Ste
   - Levels 1–2 are warm-ups. From level 3, if nobody fails, the slowest player goes. If everyone fails, the level comes back harder.
   - The last one standing wins. The payout is 1st +20, 2nd +10, 3rd +5 and last −5, all set in `GameConfig`.
   - A scoreline on the game panel shows how each level is going (pips for 3 of 5 caught, a count like 7 / 16, or a progress bar) and what you have left (shots, tries).
+  - Every rule card plays level 1 by itself as a short demo, with a hand showing the moves.
+- **The host sets up the match:**
+  - the match length: Short (first to 50), Standard (100) or Long (150);
+  - which minigames are in the deck, picked from a ticket list.
+
+  The host can also kick a player from the lobby. Mid-match, Esc opens a menu to resume, change settings, or leave; the host can end the match for everyone.
 - **20 question rounds** also exist. They are game-theory dilemmas where your payoff depends on what the rest of the room picks.
   - Playtesters didn't enjoy them, so they are switched off (`GameConfig.questionRounds`).
   - Nothing was deleted, so they can be turned back on and dealt between minigames.
@@ -29,15 +35,16 @@ More screenshots are in [`docs/screenshots`](docs/screenshots). They are the Ste
 
 Signals never rely on red against green alone. Games say NOW / GO / STOP in words, number their cards, or use colors that also differ in brightness.
 
-**Status:** playable prototype, with a first Windows release candidate (0.1.0, rebuilt 1 Oct 2026 with the art pass and an app icon).
+**Status:** playable prototype, with a first Windows release candidate (0.1.0, rebuilt 2 Oct 2026 with the illustrated art, the how-to-play demos and an app icon).
 - Playtests shaped it:
   - The first playtest found the questions too wordy and the minigames the most fun. That led to more minigames per match, a full UI rebuild in the Tabloid style, and a review pass that fixed more than 20 bugs.
   - Later playtesters found the questions not fun at all, so matches are now minigames only.
 - 49 minigames have been added since the first playtest: mouse, catching, reflex, physics and memory games, each still one file.
 - What exists:
   - the voiced host, with 150 of 165 lines recorded;
-  - 161 EditMode tests and PlayMode smoke tests;
-  - a one-click release builder that checks the project before it builds.
+  - 169 EditMode tests and PlayMode smoke tests;
+  - a one-click release builder that checks the project before it builds;
+  - a 62-second trailer cut from the game's own screens, with original synthesized music.
 - Still open (see [`docs/SMARTEST_STATUS.md`](docs/SMARTEST_STATUS.md)):
   - No match has been played across two machines yet. Online hosting itself is verified: a test signs in and opens a real private Relay lobby.
   - Difficulty ramps are first drafts, except Tightrope's, which was tuned against a simulated player.
@@ -69,11 +76,11 @@ The whole interface is drawn in a newspaper style:
 | Input | Unity **Input System** |
 | UI | uGUI + **TextMesh Pro**, dynamic font assets generated from TTFs (Turkish glyphs included) |
 | Audio | Host voice lines generated with **ElevenLabs** TTS; sound effects synthesized in code |
-| Testing | Unity Test Framework: 161 EditMode tests; PlayMode match-flow, minigame smoke and screenshot-tour tests; explicit checks that render the store screenshots and open a real online lobby |
+| Testing | Unity Test Framework: 169 EditMode tests; PlayMode match-flow, minigame smoke and screenshot-tour tests; explicit checks that render the store screenshots and open a real online lobby |
 
 ## What I built
 
-All game code lives in **`Assets/_Smartest/`**: 143 C# scripts, about 30k lines.
+All game code lives in **`Assets/_Smartest/`**: 150 C# scripts, about 32k lines.
 
 | System | Key scripts |
 |---|---|
@@ -84,10 +91,11 @@ All game code lives in **`Assets/_Smartest/`**: 143 C# scripts, about 30k lines.
 | Tabloid UI kit: color and type tokens, code-drawn ink art and illustrations, stickers, stamps, headlines and effects | `Scripts/Core/Palette.cs`, `Typo.cs`, `FontSet.cs`, `Scripts/UI/Kit/InkSprites.cs`, `InkArt.cs`, `Ink.cs`, `HardShadow.cs`, `TextDrop.cs`, `Burst.cs` |
 | HUD: masthead, race to 100, seat rail and seat cards, host caption | `Scripts/UI/Hud/*` |
 | Networking and lobby | `Scripts/Net/NetSession.cs`, `PlayerData.cs`, `Scripts/UI/MenuUI.cs`, `LobbyUI.cs`, `LobbySeat.cs` |
+| Lobby and match options: match length, the minigame picker, kick, the in-match menu, screen settings | `Scripts/Rounds/HostOptions.cs`, `Scripts/Net/MatchSettings.cs`, `Scripts/UI/MinigamePicker.cs`, `MatchMenu.cs`, `SettingsPanel.cs` |
 | Game screens (question, reveal, winner, settings) | `Scripts/UI/GameUI.cs`, `RoundPanel.cs`, `RevealPanel.cs`, `WinnerPanel.cs`, `SettingsPanel.cs` |
 | Voiced host and audio direction | `Scripts/Core/VoiceScript.cs`, `VoiceLines.cs`, `AudioDirector.cs`; code-generated SFX in `Sounds.cs` |
 | Editor tooling | `Editor/SceneBuilder.cs`, `ReleaseBuilder.cs`, `VoiceStudioWindow.cs`, `VoiceWiring.cs`, `RetiredFileCleanup.cs` |
-| Tests | EditMode: `ResolverTests`, `MinigameTests`, `DeckTests`, `TabloidTests`, `VoiceScriptTests`. PlayMode: `MatchFlowTests`, `MinigameSmokeTests`, `ScreenshotTour`, `SteamShots`, `OnlineHostingCheck` |
+| Tests | EditMode: `ResolverTests`, `MinigameTests`, `DeckTests`, `TabloidTests`, `VoiceScriptTests`, `HostOptionsTests`. PlayMode: `MatchFlowTests`, `MinigameSmokeTests`, `ScreenshotTour`, `SteamShots`, `TrailerCapture`, `OnlineHostingCheck` |
 
 The editor tooling covers:
 - **`SceneBuilder`:** a one-click (and headless) builder that regenerates both scenes, the prefabs, the ink art, the font assets and all 89 challenge assets from code.
@@ -97,6 +105,7 @@ The editor tooling covers:
   - Every build ships with the SIL Open Font License texts.
 - **Voice tools:** a voice-line recording studio that can also record missing lines headless from the command line, and the wiring of the recorded lines.
 - **`RetiredFileCleanup`:** a cleanup tool for files retired in the redesign.
+- **Trailer tools:** the explicit `TrailerCapture` test records the game's own screens. `Tools/Trailer/build_trailer.py` then edits them into a 1080p trailer with title cards and the host's voice, over music synthesized by `Tools/Trailer/music.py`.
 
 ### Code highlights
 
@@ -145,6 +154,6 @@ This is almost entirely original code and code-drawn art. Imported content:
 
 ## About this repository
 
-This public repository is a **showcase**. It contains the documentation and the **155 source files I wrote** for this project. The complete project, including licensed third-party assets that cannot be redistributed, is kept in a private repository.
+This public repository is a **showcase**. It contains the documentation and the **157 source files I wrote** for this project. The complete project, including licensed third-party assets that cannot be redistributed, is kept in a private repository.
 
 Copyright © Omer Avcioglu (McHunter Studio). **All rights reserved.** Viewing only; see [LICENSE](LICENSE).
