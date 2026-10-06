@@ -445,14 +445,14 @@ namespace Smartest.Minigames
 
         private void Update()
         {
-            UpdateDemo(Time.unscaledDeltaTime);
+            UpdateDemo(Smartest.Core.GameClock.Delta);
             if (!_armed) return;
 
             // Lead-in: the same "3, 2, 1" on every machine, ending at the same instant.
             if (!_begun)
             {
-                _startIn -= Time.unscaledDeltaTime;
-                _deadline -= Time.unscaledDeltaTime;
+                _startIn -= Smartest.Core.GameClock.Delta;
+                _deadline -= Smartest.Core.GameClock.Delta;
                 int n = Mathf.CeilToInt(_startIn);
                 if (leadInBurst != null) leadInBurst.SetDigit(n > 0 ? n.ToString() : "GO");
                 if (n != _lastCount)
@@ -472,7 +472,7 @@ namespace Smartest.Minigames
                 return;
             }
 
-            _deadline -= Time.unscaledDeltaTime;
+            _deadline -= Smartest.Core.GameClock.Delta;
             if (timer != null) timer.Set(Mathf.Max(0f, _deadline));
 
             if (_deadline <= 0f)
@@ -664,7 +664,7 @@ namespace Smartest.Minigames
             if (img != null) img.color = Palette.Gold;
             cap.localScale = new Vector3(1f, 0.88f, 1f);
             float t = 0f;
-            while (t < 0.18f) { t += Time.unscaledDeltaTime; yield return null; }
+            while (t < 0.18f) { t += Smartest.Core.GameClock.Delta; yield return null; }
             if (cap == null) yield break;
             cap.localScale = Vector3.one;
             if (img != null) img.color = colour;

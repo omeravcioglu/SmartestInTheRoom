@@ -289,9 +289,9 @@ namespace Smartest.Minigames
 
         private void Update()
         {
-            if (!Demo) { Advance(Time.unscaledDeltaTime); return; }
+            if (!Demo) { Advance(Smartest.Core.GameClock.Delta); return; }
             Sounds.Hush(true);
-            try { Advance(Mathf.Min(Time.unscaledDeltaTime, DemoLongestStep)); }
+            try { Advance(Mathf.Min(Smartest.Core.GameClock.Delta, DemoLongestStep)); }
             finally { Sounds.Hush(false); }
         }
 

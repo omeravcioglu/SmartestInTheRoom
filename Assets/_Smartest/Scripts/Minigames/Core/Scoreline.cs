@@ -88,7 +88,7 @@ namespace Smartest.Minigames
         private void Update()
         {
             if (_punched == null) return;
-            _punch = Mathf.Max(0f, _punch - Time.unscaledDeltaTime / PunchFor);
+            _punch = Mathf.Max(0f, _punch - Smartest.Core.GameClock.Delta / PunchFor);
             _punched.localScale = Vector3.one * (1f + 0.6f * _punch);
             if (_punch <= 0f) _punched = null;
         }

@@ -67,7 +67,7 @@ namespace Smartest.Core
             while (elapsed < duration)
             {
                 onUpdate(Evaluate(ease, elapsed / duration));
-                elapsed += unscaled ? Time.unscaledDeltaTime : Time.deltaTime;
+                elapsed += unscaled ? GameClock.Delta : Time.deltaTime;
                 yield return null;
             }
 

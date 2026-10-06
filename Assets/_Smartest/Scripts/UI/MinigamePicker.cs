@@ -54,7 +54,7 @@ namespace Smartest.UI
                 Close();
                 return;
             }
-            if (_noteUntil > 0f && Time.unscaledTime > _noteUntil)
+            if (_noteUntil > 0f && Smartest.Core.GameClock.Now > _noteUntil)
             {
                 _noteUntil = 0f;
                 SetNote(Note, Palette.Ink2);
@@ -116,7 +116,7 @@ namespace Smartest.UI
             {
                 // Refused: it's one of the last few.
                 SetNote($"Keep at least {HostOptions.MinGamesOn} games in the deck.", Palette.RedText);
-                _noteUntil = Time.unscaledTime + 2.5f;
+                _noteUntil = Smartest.Core.GameClock.Now + 2.5f;
                 Sounds.Play(Sounds.Kind.Bad);
                 return;
             }

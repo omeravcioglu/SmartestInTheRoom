@@ -2,13 +2,14 @@
 
   1. Record the footage (an explicit PlayMode test; needs graphics, so no -nographics):
        Unity.exe -batchmode -projectPath . -runTests -testPlatform PlayMode -testFilter TrailerCapture
-     It writes Steam/Trailer/footage/<clip>/f00000.jpg ... and times.txt (when each frame was taken).
+     It writes Steam/Trailer/footage/<clip>/f00000.jpg ... and times.txt (when each frame was taken),
+     60 frames to each second of game time.
   2. python Tools/Trailer/build_trailer.py [--footage DIR] [--work DIR] [--out FILE]
      needs ffmpeg on the PATH and numpy + Pillow.
 
-Every clip is resampled to exactly 30 fps from its timestamps, the cards are drawn in the game's
+Every clip is resampled to exactly 60 fps from its timestamps, the cards are drawn in the game's
 fonts and colours, music.py writes the score to the same bars as the edit, and the voice lines
-duck the music while they play. Output: H.264 1920 x 1080 at 30 fps with AAC stereo.
+duck the music while they play. Output: H.264 1920 x 1080 at 60 fps with AAC stereo.
 """
 import argparse
 import bisect
@@ -24,7 +25,7 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import music  # noqa: E402
 
-FPS = 30
+FPS = 60
 W, H = 1920, 1080
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 FONTS = os.path.join(ROOT, "Assets", "_Smartest", "Fonts")
@@ -49,7 +50,7 @@ TIMELINE = (
        ("clip", "knockout", 0.3, 4.0)]
     + [("clip", c, 0.15, 2.0) for c in MONTAGE_TWO]
     + [("card", "FIRST TO 100…", None, 2.0),
-       ("clip", "closing", 0.4, 3.0),
+       ("clip", "closing", 0.1, 3.0),
        ("clip", "winner", 0.1, 5.0),
        ("end", None, None, 6.0)]
 )
@@ -58,10 +59,10 @@ TIMELINE = (
 VOICE_CUES = [
     (0.25, "menu_welcome_2.mp3"),     # Look who it is. Get your friends in, first to a hundred points...
     (10.3, "minigame_start_2.mp3"),   # Minigame! Actual skill required, sorry.
-    (33.45, "you_are_out_4.mp3"),     # Out! You're out. It's fine. It's fine.
+    (34.2, "you_are_out_4.mp3"),      # Out! You're out. It's fine. It's fine. (after the trombone)
     (44.15, "minigame_last_two_1.mp3"),  # Two left! This is the good part.
     (48.1, "close_to_win_3.mp3"),     # One good round and this is over. Just saying.
-    (51.4, "winner_1.mp3"),           # A HUNDRED! That's the game! Smartest in the room, officially...
+    (52.2, "winner_1.mp3"),           # A HUNDRED! That's the game! Smartest in the room, officially... (after the fanfare)
 ]
 
 
@@ -106,7 +107,7 @@ def headline_layer(lines, max_width=1640, max_size=250):
 def slam(base, layer, frames, path_for):
     """The layer lands on the page: it starts a little big and settles in a fifth of a second."""
     for i in range(frames):
-        e = min(1.0, i / 6.0)
+        e = min(1.0, i / (0.2 * FPS))
         scale = 1.0 + 0.16 * (1 - e) ** 3
         frame = base.copy()
         if scale != 1.0:
@@ -163,12 +164,15 @@ def read_times(clip_dir):
 
 
 def footage_frames(clip_dir, start, seconds):
-    """The frame on screen at each 1/30 s from `start`: the last one taken at or before it."""
+    """The frame nearest each 1/60 s from `start`."""
     times = read_times(clip_dir)
     out = []
     for k in range(int(round(seconds * FPS))):
         t = start + k / FPS
-        i = max(0, min(len(times) - 1, bisect.bisect_right(times, t) - 1))
+        i = bisect.bisect_left(times, t)
+        if i >= len(times) or (i > 0 and t - times[i - 1] <= times[i] - t):
+            i -= 1
+        i = max(0, min(len(times) - 1, i))
         out.append(os.path.join(clip_dir, f"f{i:05d}.jpg"))
     return out
 
@@ -211,7 +215,7 @@ def mix_audio(seconds):
     duck = np.convolve(duck, np.ones(k) / k, mode="same").astype(np.float32)
     mix = score * duck[:, None] + voice
     mix = np.tanh(mix * 1.1) / np.tanh(1.1)
-    mix *= 0.96 / (np.abs(mix).max() + 1e-9)
+    mix *= 0.89 / (np.abs(mix).max() + 1e-9)   # -1 dB: room for the AAC encode
     return mix
 
 
@@ -267,7 +271,7 @@ def main():
     video = os.path.join(work, "video.mp4")
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-framerate", str(FPS), "-i", os.path.join(seq, "%05d.jpg"),
                     # Near lossless: Steam re-encodes uploads, so give it plenty to work from.
-                    "-c:v", "libx264", "-preset", "slow", "-crf", "12", "-pix_fmt", "yuv420p", "-r", str(FPS), video],
+                    "-c:v", "libx264", "-preset", "slow", "-crf", "14", "-pix_fmt", "yuv420p", "-r", str(FPS), video],
                    check=True)
     audio = os.path.join(work, "mix.wav")
     write_wav(audio, mix_audio(total))

@@ -165,8 +165,8 @@ namespace Smartest.UI
         /// <summary>A blip while dragging, throttled so a slider drag isn't a machine gun.</summary>
         private void Preview(AudioDirector.Channel channel)
         {
-            if (Time.unscaledTime - _lastPreview < 0.12f) return;
-            _lastPreview = Time.unscaledTime;
+            if (Smartest.Core.GameClock.Now - _lastPreview < 0.12f) return;
+            _lastPreview = Smartest.Core.GameClock.Now;
             var d = AudioDirector.Instance;
             if (d != null) d.PreviewChannel(channel);
         }

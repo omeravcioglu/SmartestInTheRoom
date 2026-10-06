@@ -138,11 +138,11 @@ namespace Smartest.UI
         private void Update()
         {
             // "just joined" wears off on its own.
-            if (Time.unscaledTime < _nextNoteCheck) return;
-            _nextNoteCheck = Time.unscaledTime + 0.5f;
+            if (Smartest.Core.GameClock.Now < _nextNoteCheck) return;
+            _nextNoteCheck = Smartest.Core.GameClock.Now + 0.5f;
             foreach (var kv in _joinedAt)
             {
-                float age = Time.unscaledTime - kv.Value;
+                float age = Smartest.Core.GameClock.Now - kv.Value;
                 if (age >= JustJoinedSeconds && age < JustJoinedSeconds + 0.6f) { Refresh(); break; }
             }
         }
@@ -168,7 +168,7 @@ namespace Smartest.UI
             {
                 present.Add(p.OwnerClientId);
                 if (!_joinedAt.ContainsKey(p.OwnerClientId))
-                    _joinedAt[p.OwnerClientId] = _lastCount == 0 ? -999f : Time.unscaledTime;
+                    _joinedAt[p.OwnerClientId] = _lastCount == 0 ? -999f : Smartest.Core.GameClock.Now;
             }
             var gone = new List<ulong>();
             foreach (var kv in _joinedAt) if (!present.Contains(kv.Key)) gone.Add(kv.Key);
@@ -186,7 +186,7 @@ namespace Smartest.UI
                 {
                     var p = players[i];
                     string tag = p.IsHostPlayer && p.IsOwner ? "HOST · YOU" : p.IsHostPlayer ? "HOST" : p.IsOwner ? "YOU" : string.Empty;
-                    bool fresh = _joinedAt.TryGetValue(p.OwnerClientId, out float at) && Time.unscaledTime - at < JustJoinedSeconds;
+                    bool fresh = _joinedAt.TryGetValue(p.OwnerClientId, out float at) && Smartest.Core.GameClock.Now - at < JustJoinedSeconds;
                     // The host can send anyone else away, but not once a match is starting.
                     bool kickable = isHost && !p.IsOwner && !(net != null && net.GameStarted);
                     seat.SetTaken(i + 1, p.OwnerClientId, p.DisplayName, monos[i], tag, p.IsOwner,

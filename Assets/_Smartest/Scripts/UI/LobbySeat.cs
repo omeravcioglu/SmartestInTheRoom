@@ -43,7 +43,7 @@ namespace Smartest.UI
 
         private void Update()
         {
-            if (_askingUntil > 0f && Time.unscaledTime > _askingUntil) StopAsking();
+            if (_askingUntil > 0f && Smartest.Core.GameClock.Now > _askingUntil) StopAsking();
         }
 
         public void SetTaken(int seat, ulong clientId, string playerName, string monogram, string tag, bool you,
@@ -94,7 +94,7 @@ namespace Smartest.UI
         {
             if (_askingUntil <= 0f)
             {
-                _askingUntil = Time.unscaledTime + AskSeconds;
+                _askingUntil = Smartest.Core.GameClock.Now + AskSeconds;
                 ShowAsking(true);
                 Sounds.Play(Sounds.Kind.Click);
                 return;

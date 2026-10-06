@@ -46,7 +46,7 @@ namespace Smartest.UI
 
         private void Update()
         {
-            if (_asking != null && Time.unscaledTime > _askingUntil) StopAsking();
+            if (_asking != null && Smartest.Core.GameClock.Now > _askingUntil) StopAsking();
             if (_leaving || !KeyInput.EscapePressed()) return;
             if (settings != null && settings.IsShown) return; // Esc closes the settings first
             Toggle();
@@ -151,7 +151,7 @@ namespace Smartest.UI
             StopAsking();
             _asking = button;
             _askingWord = WordOf(button);
-            _askingUntil = Time.unscaledTime + AskSeconds;
+            _askingUntil = Smartest.Core.GameClock.Now + AskSeconds;
             SetWord(button, Ask);
             Paint(button, Palette.Red, Palette.OnRed);
             Sounds.Play(Sounds.Kind.Click);

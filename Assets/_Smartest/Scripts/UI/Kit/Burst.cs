@@ -98,7 +98,7 @@ namespace Smartest.UI
         private void Update()
         {
             if (_punch <= 0f) return;
-            _punch = Mathf.Max(0f, _punch - Time.unscaledDeltaTime / 0.28f);
+            _punch = Mathf.Max(0f, _punch - Smartest.Core.GameClock.Delta / 0.28f);
             float k = 1f + 0.14f * Tween.Evaluate(Ease.OutQuad, _punch);
             transform.localScale = new Vector3(k, k, 1f);
         }

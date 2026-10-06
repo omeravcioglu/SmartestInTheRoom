@@ -136,7 +136,7 @@ namespace Smartest.Core
             if (once && _playedOnce.Contains(key)) return;
 
             if (line.cooldownSec > 0f && _lastPlayed.TryGetValue(key, out var last) &&
-                Time.unscaledTime - last < line.cooldownSec) return;
+                GameClock.Now - last < line.cooldownSec) return;
 
             if (line.mode == PlayMode.Chance && UnityEngine.Random.value > line.chance) return;
 
@@ -152,7 +152,7 @@ namespace Smartest.Core
             if (!director.PlayNarration(clip, interrupt: true)) return;
 
             _currentPriority = line.priority;
-            _lastPlayed[key] = Time.unscaledTime;
+            _lastPlayed[key] = GameClock.Now;
             if (once) _playedOnce.Add(key);
             StartCoroutine(ResetPriorityAfter(clip.length));
 

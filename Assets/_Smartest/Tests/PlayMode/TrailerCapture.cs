@@ -21,8 +21,9 @@ using Object = UnityEngine.Object;
 namespace Smartest.Tests
 {
     /// <summary>
-    /// The trailer's footage: the game's own screens, recorded as numbered JPEGs (up to 30 a
-    /// second, each clip in its own folder with times.txt saying when every frame was taken)
+    /// The trailer's footage: the game's own screens, recorded as numbered JPEGs at exactly 60 a
+    /// second of game time (GameClock steps 1/60 s a frame while this runs, however long a frame
+    /// takes to save, so there are no hitches; each clip in its own folder with times.txt)
     /// for Tools/Trailer/build_trailer.py to cut to music. Staged the way SteamShots stages its
     /// pictures: the real Menu and Game scenes, seven stand-ins round the table, and each
     /// minigame playing itself. The host's bubble says what the trailer's voice-over says.
@@ -35,7 +36,8 @@ namespace Smartest.Tests
     public class TrailerCapture
     {
         private const int Width = 1920, Height = 1080;
-        private const float Fps = 30f;
+        private const float Fps = 60f;
+        private const int MaxPending = 64;  // JPEGs being written at once
         private const float MontageClip = 2.3f; // the edit uses 2 s; the rest is room to trim
 
         private static readonly string[] Names = { "Mert", "Ayşe", "Deniz", "Burak", "Can", "Elif", "Zeynep", "Kerem" };
@@ -112,7 +114,7 @@ namespace Smartest.Tests
         private string _clipDir;
         private StreamWriter _times;
         private int _frame;
-        private float _clipStart, _nextGrab;
+        private float _clipStart;
         private int _pending;
         private List<SeatCard> _cards = new List<SeatCard>();
 
@@ -146,6 +148,7 @@ namespace Smartest.Tests
             if (_cam != null) Object.Destroy(_cam.gameObject);
             if (_rt != null) { _rt.Release(); Object.Destroy(_rt); }
             if (_grab != null) Object.Destroy(_grab);
+            GameClock.SetFixedStep(0f);
         }
 
         [UnityTest]
@@ -154,8 +157,10 @@ namespace Smartest.Tests
         {
             // A recording tool, not a check: an editor package grumbling in the log shouldn't stop it.
             LogAssert.ignoreFailingMessages = true;
-            Application.targetFrameRate = 60;
+            Application.targetFrameRate = -1;
             QualitySettings.vSyncCount = 0;
+            // Every frame moves the game on exactly 1/60 s: a slow save never shows as a stutter.
+            GameClock.SetFixedStep(1f / Fps);
             MakeCamera();
             var monos = Monogram.ForAll(Names);
 
@@ -467,17 +472,18 @@ namespace Smartest.Tests
             foreach (var old in Directory.GetFiles(_clipDir)) File.Delete(old); // this clip's last take
             _times = new StreamWriter(Path.Combine(_clipDir, "times.txt"));
             _frame = 0;
-            _clipStart = Time.unscaledTime;
-            _nextGrab = _clipStart;
+            _clipStart = GameClock.Now;
         }
 
         private IEnumerator RecordFor(float seconds)
         {
-            float until = Time.unscaledTime + seconds;
-            while (Time.unscaledTime < until)
+            int frames = Mathf.RoundToInt(seconds * Fps);
+            for (int i = 0; i < frames; i++)
             {
                 yield return null;
-                if (Time.unscaledTime >= _nextGrab && Volatile.Read(ref _pending) < 48) Grab();
+                // The game clock waits with us, so falling behind costs time, never a frame.
+                while (Volatile.Read(ref _pending) >= MaxPending) Thread.Sleep(2);
+                Grab();
             }
         }
 
@@ -491,16 +497,14 @@ namespace Smartest.Tests
             byte[] raw = _grab.GetRawTextureData<byte>().ToArray();
             var format = _grab.graphicsFormat;
             string path = Path.Combine(_clipDir, $"f{_frame:D5}.jpg");
-            _times.WriteLine($"{_frame} {Time.unscaledTime - _clipStart:0.0000}");
+            _times.WriteLine($"{_frame} {GameClock.Now - _clipStart:0.0000}");
             _frame++;
-            _nextGrab += 1f / Fps;
-            if (_nextGrab < Time.unscaledTime) _nextGrab = Time.unscaledTime;
             Interlocked.Increment(ref _pending);
             Task.Run(() =>
             {
                 try
                 {
-                    File.WriteAllBytes(path, ImageConversion.EncodeArrayToJPG(raw, format, (uint)Width, (uint)Height, 0, 92));
+                    File.WriteAllBytes(path, ImageConversion.EncodeArrayToJPG(raw, format, (uint)Width, (uint)Height, 0, 95));
                 }
                 finally
                 {
@@ -516,8 +520,11 @@ namespace Smartest.Tests
                 _times.Dispose();
                 _times = null;
             }
-            while (Volatile.Read(ref _pending) > 0) yield return null;
-            Debug.Log($"[TrailerCapture] {Path.GetFileName(_clipDir)}: {_frame} frames");
+            while (Volatile.Read(ref _pending) > 0) Thread.Sleep(2);
+            float span = GameClock.Now - _clipStart;
+            Debug.Log($"[TrailerCapture] {Path.GetFileName(_clipDir)}: {_frame} frames over {span:0.000} s " +
+                      $"({(span > 0 ? _frame / span : 0f):0} a second)");
+            yield return null;
         }
 
         // ------------------------------------------------------------------
@@ -527,7 +534,7 @@ namespace Smartest.Tests
         private static IEnumerator Wait(float seconds)
         {
             float t = 0f;
-            while (t < seconds) { t += Time.unscaledDeltaTime; yield return null; }
+            while (t < seconds) { t += GameClock.Delta; yield return null; }
         }
 
         private static IEnumerator WaitFor(Func<bool> condition, float seconds, string what)
@@ -535,7 +542,7 @@ namespace Smartest.Tests
             float waited = 0f;
             while (!condition())
             {
-                waited += Time.unscaledDeltaTime;
+                waited += GameClock.Delta;
                 if (waited > seconds) Assert.Fail("Timed out waiting for " + what + ".");
                 yield return null;
             }
