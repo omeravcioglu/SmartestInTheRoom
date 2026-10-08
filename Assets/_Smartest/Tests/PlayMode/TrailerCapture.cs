@@ -104,6 +104,21 @@ namespace Smartest.Tests
                 OutAt = new[] { 0, 0, 0, 0, 3, 0, 2, 0 } },
         };
 
+        // ---- The hype trailer's extra footage (HypeFootage) ----
+
+        // Eighteen more games, so its drops can cut on every beat without repeating one.
+        private static readonly (string game, int level, int seed, float preRoll)[] MoreGames =
+        {
+            ("darts", 4, 7101, 1.0f), ("hoops", 4, 7102, 1.2f), ("putt", 4, 7103, 1.0f), ("buzz_wire", 4, 7104, 1.0f),
+            ("catch", 4, 7105, 1.0f), ("chase", 4, 7106, 1.0f), ("fireflies", 4, 7107, 1.0f), ("good_catch", 4, 7108, 1.2f),
+            ("lasers", 4, 7109, 1.0f), ("pop", 4, 7110, 1.0f), ("road", 4, 7111, 1.0f), ("runaway", 4, 7112, 1.0f),
+            ("tag", 4, 7113, 1.0f), ("toss", 4, 7114, 1.0f), ("dodge", 5, 7115, 1.5f), ("shell_game", 3, 7116, 1.0f),
+            ("spotlight", 4, 7117, 1.0f), ("decoy", 4, 7118, 1.0f),
+        };
+
+        // Slow motion: recorded with the game clock stepping 1/240 s a frame, played back at 60.
+        private const float SlowStep = 1f / 240f;
+
         private NetworkMode _savedMode;
         private HostOptions _savedOptions;
         private string _dir;
@@ -298,6 +313,121 @@ namespace Smartest.Tests
             Debug.Log($"[TrailerCapture] footage in {_dir}");
         }
 
+        /// <summary>
+        /// The hype trailer's extra footage, into the same folder as Footage's: eighteen more
+        /// minigames (x-*), a level's 3-2-1 lead-in (countdown), a rule card with its demo
+        /// (rulecard), and two shots in 4x slow motion (slowmo-*). Run on its own with
+        /// -testFilter Smartest.Tests.TrailerCapture.HypeFootage.
+        /// </summary>
+        [UnityTest]
+        [Timeout(3600000)]
+        public IEnumerator HypeFootage()
+        {
+            LogAssert.ignoreFailingMessages = true;
+            Application.targetFrameRate = -1;
+            QualitySettings.vSyncCount = 0;
+            GameClock.SetFixedStep(1f / Fps);
+            MakeCamera();
+            var monos = Monogram.ForAll(Names);
+
+            // Into a match, holding the host's clock so each moment can be staged.
+            yield return Wait(1.0f);
+            var menu = Object.FindAnyObjectByType<MenuUI>();
+            Assert.IsNotNull(menu, "the Menu scene should have a MenuUI");
+            Call(menu, "OnHostClicked");
+            var lobby = Get<LobbyUI>(menu, "lobby");
+            yield return WaitFor(() => lobby.IsShown, 15f, "the lobby");
+            yield return Wait(0.5f);
+            NetSession.Instance.StartGame();
+            yield return WaitFor(() => GameState.Instance != null && GameState.Instance.IsSpawned
+                                       && GameState.Instance.Phase.Value == GamePhase.RoundIntro, 20f, "the first round");
+            yield return Wait(1.0f);
+            var phaseEnd = typeof(GameState).GetField("_phaseEnd", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(phaseEnd, "GameState._phaseEnd not found");
+            phaseEnd.SetValue(GameState.Instance, double.MaxValue);
+            AimCanvases();
+
+            var ui = Object.FindAnyObjectByType<GameUI>();
+            Assert.IsNotNull(ui, "the Game scene should have a GameUI");
+            var stage = Get<MinigameStage>(ui, "minigameStage");
+            var round = Get<RoundPanel>(ui, "roundPanel");
+            var rail = Get<SeatRail>(ui, "seatRail");
+            var masthead = Get<Masthead>(ui, "masthead");
+            var caption = Get<HostCaption>(ui, "hostCaption");
+            if (rail != null) rail.enabled = false;
+            if (round != null) round.HideInstant();
+            if (caption != null) caption.Hide();
+            stage.ShowInstant();
+            var allIn = new int[Names.Length];
+
+            // ---- A rule card, its demo playing ----
+            {
+                var entry = MinigameRegistry.Get("pop_lock");
+                yield return Table(rail, masthead, monos, 3, 1, Early, allIn, new int[0], null);
+                stage.ShowIntro(entry, entry.Title, entry.Rule, Names.Length);
+                yield return Wait(0.4f);
+                BeginClip("rulecard");
+                yield return RecordFor(4.0f);
+                yield return EndClip();
+            }
+
+            // ---- A level's lead-in: the game's own 3, 2, 1 ----
+            {
+                var entry = MinigameRegistry.Get("darts");
+                yield return Table(rail, masthead, monos, 7, 3, Middle, allIn, new int[0], null);
+                BeginClip("countdown");
+                stage.StartLevel(entry, 3, 7001, true, Names.Length, 3.0f, entry.LevelSeconds, false);
+                var view = Get<MinigameView>(stage, "_view");
+                if (view != null) view.Interactive = false;
+                stage.SetAlive(Alive(allIn, monos));
+                yield return RecordFor(3.8f);
+                yield return EndClip();
+                stage.EndMinigame();
+            }
+
+            // ---- Eighteen more games ----
+            for (int i = 0; i < MoreGames.Length; i++)
+            {
+                var (game, level, seed, preRoll) = MoreGames[i];
+                var outAt = new int[Names.Length];
+                if (i % 3 == 1) { outAt[5] = 2; outAt[7] = 1; } // now and then a seat or two already out
+                if (i % 3 == 2) { outAt[4] = 3; outAt[6] = 2; outAt[7] = 1; }
+                var clip = new Clip
+                {
+                    Name = "x-" + game.Replace('_', '-'), Game = game, Round = 3 + i % 9, Level = level, Seed = seed,
+                    PreRoll = preRoll, Scores = i % 2 == 0 ? Middle : Late, OutAt = outAt,
+                };
+                yield return Level(clip, stage, rail, masthead, caption, monos);
+            }
+
+            // ---- Slow motion: the penalty kick, an orange sliced ----
+            yield return SlowMotion("slowmo-penalty", "penalty", 4, 909, 1.1f, 0.75f, Late,
+                new[] { 0, 0, 0, 0, 3, 0, 2, 1 }, stage, rail, masthead, monos);
+            yield return SlowMotion("slowmo-slice", "slice", 4, 303, 0.5f, 0.7f, Early,
+                new[] { 0, 0, 0, 0, 0, 3, 0, 2 }, stage, rail, masthead, monos);
+            Debug.Log($"[TrailerCapture] hype footage in {_dir}");
+        }
+
+        /// <summary>A level played at normal speed up to `at`, then recorded with the clock at a quarter speed.</summary>
+        private IEnumerator SlowMotion(string name, string game, int level, int seed, float at, float gameSeconds,
+            int[] scores, int[] outAt, MinigameStage stage, SeatRail rail, Masthead masthead, List<string> monos)
+        {
+            var entry = MinigameRegistry.Get(game);
+            if (entry == null) yield break;
+            yield return Table(rail, masthead, monos, 9, level, scores, outAt, new int[0], null);
+            stage.StartLevel(entry, level, seed, true, Alive(outAt, monos).Count, 0.01f, entry.LevelSeconds, false);
+            var view = Get<MinigameView>(stage, "_view");
+            if (view != null) view.Interactive = false;
+            stage.SetAlive(Alive(outAt, monos));
+            yield return Wait(at);
+            GameClock.SetFixedStep(SlowStep);
+            BeginClip(name);
+            yield return RecordFor(gameSeconds);
+            yield return EndClip();
+            GameClock.SetFixedStep(1f / Fps);
+            stage.EndMinigame();
+        }
+
         // ------------------------------------------------------------------
         // Staged moments
         // ------------------------------------------------------------------
@@ -475,9 +605,11 @@ namespace Smartest.Tests
             _clipStart = GameClock.Now;
         }
 
+        /// <summary>Seconds of game time, a frame for every step of the game clock (1/60 s, or less in slow motion).</summary>
         private IEnumerator RecordFor(float seconds)
         {
-            int frames = Mathf.RoundToInt(seconds * Fps);
+            float step = GameClock.FixedStep > 0f ? GameClock.FixedStep : 1f / Fps;
+            int frames = Mathf.RoundToInt(seconds / step);
             for (int i = 0; i < frames; i++)
             {
                 yield return null;
