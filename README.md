@@ -105,7 +105,10 @@ The editor tooling covers:
   - Every build ships with the SIL Open Font License texts.
 - **Voice tools:** a voice-line recording studio that can also record missing lines headless from the command line, and the wiring of the recorded lines.
 - **`RetiredFileCleanup`:** a cleanup tool for files retired in the redesign.
-- **Trailer tools:** the explicit `TrailerCapture` test records the game's own screens. `Tools/Trailer/build_trailer.py` then edits them into a 1080p trailer with title cards and the host's voice, over music synthesized by `Tools/Trailer/music.py`.
+- **Trailer tools:**
+  - The explicit `TrailerCapture` test records the game's own screens on a fixed-step clock (`Scripts/Core/GameClock.cs`), so every frame moves the game on by exactly the same amount however slowly it is captured.
+  - `Tools/Trailer/build_trailer.py` edits the footage into a 1080p trailer with title cards and the host's voice, over music synthesized by `music.py`.
+  - `music_hype.py` synthesizes a 150 BPM track for a faster cut, which is still in progress.
 
 ### Code highlights
 
